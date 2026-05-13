@@ -1,0 +1,39 @@
+{
+  "name": "phel-lang/cli-skeleton",
+  "description": "A minimalistic skeleton to build your cli-app using Phel Lang.",
+  "keywords": [
+    "phel",
+    "lisp",
+    "functional",
+    "language"
+  ],
+  "homepage": "https://phel-lang.org/",
+  "license": "MIT",
+  "type": "project",
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "require": {
+    "php": ">=8.4",
+    "phel-lang/phel-lang": "dev-main",
+    "symfony/console": "^7.3"
+  },
+  "require-dev": {
+    "symfony/var-dumper": "^7.3"
+  },
+  "autoload": {
+    "psr-4": {
+      "PhelGenerated\\": "src/PhelGenerated"
+    }
+  },
+  "scripts": {
+    "dev": "vendor/bin/phel run cli-skeleton.main",
+    "build": "vendor/bin/phel build --no-cache",
+    "export": "vendor/bin/phel export",
+    "format": "vendor/bin/phel format",
+    "test": "vendor/bin/phel test",
+    "repl": [
+      "Composer\\Config::disableProcessTimeout",
+      "vendor/bin/phel repl"
+    ]
+  }
+}

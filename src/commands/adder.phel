@@ -1,0 +1,19 @@
+(ns cli-skeleton.commands.adder
+  (:require phel.cli :as cli)
+  (:require cli-skeleton.modules.adder-module :refer [adder]))
+
+(defn- run-adder [ctx]
+  (let [nums (map php/intval (cli/arg ctx "numbers"))]
+    (if (empty? nums)
+      (do (cli/warning ctx "Pass at least one number, e.g. `add 1 2 3`.")
+          1)
+      (do (cli/success ctx (str "Sum = " (apply adder nums)))
+          0))))
+
+(def adder-command
+  {:name "add"
+   :doc  "Sum the provided integers."
+   :args [{:name "numbers"
+           :mode :array
+           :doc  "Numbers to sum."}]
+   :run  run-adder})

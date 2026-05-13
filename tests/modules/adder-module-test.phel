@@ -1,0 +1,8 @@
+(ns cli-skeleton-tests.modules.adder-module-test
+  (:require cli-skeleton.modules.adder-module :refer [adder])
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-adder
+  (is (= 0 (adder)))
+  (is (= 6 (adder 1 2 3)))
+  (is (= -1 (adder 2 -3))))
