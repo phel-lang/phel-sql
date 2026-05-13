@@ -642,3 +642,454 @@
             :limit    10
             :offset   20
             :for      [:update :skip-locked]}))))
+
+;; ===========================================================================
+;; Function calls
+;; ===========================================================================
+
+(deftest test-fn-no-args
+  (is (= ["SELECT now()" []]
+         (sql/format {:select [[:fn :now]]}))))
+
+(deftest test-fn-star
+  (is (= ["SELECT count(*) FROM users" []]
+         (sql/format {:select [[:fn :count :*]] :from [:users]}))))
+
+(deftest test-fn-with-column
+  (is (= ["SELECT sum(amount) FROM orders" []]
+         (sql/format {:select [[:fn :sum :amount]] :from [:orders]}))))
+
+(deftest test-fn-with-alias
+  (is (= ["SELECT count(*) AS total FROM users" []]
+         (sql/format {:select [[[:fn :count :*] :total]] :from [:users]}))))
+
+(deftest test-fn-with-value-arg
+  (is (= ["SELECT date_trunc(?, created_at) FROM t" ["month"]]
+         (sql/format {:select [[:fn :date_trunc "month" :created_at]] :from [:t]}))))
+
+(deftest test-fn-nested
+  (is (= ["SELECT coalesce(name, ?) FROM t" ["unknown"]]
+         (sql/format {:select [[:fn :coalesce :name "unknown"]] :from [:t]}))))
+
+(deftest test-fn-in-where
+  (is (= ["SELECT id FROM t WHERE lower(name) = ?" ["alice"]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:= [:fn :lower :name] "alice"]}))))
+
+(deftest test-fn-rejects-non-name
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:fn 42 :x]]}))))
+
+;; ===========================================================================
+;; CAST
+;; ===========================================================================
+
+(deftest test-cast-basic
+  (is (= ["SELECT CAST(id AS INT) FROM t" []]
+         (sql/format {:select [[:cast :id :INT]] :from [:t]}))))
+
+(deftest test-cast-string-type
+  (is (= ["SELECT CAST(price AS DECIMAL(10,2)) FROM t" []]
+         (sql/format {:select [[:cast :price "DECIMAL(10,2)"]] :from [:t]}))))
+
+(deftest test-cast-with-value
+  (is (= ["UPDATE t SET v = CAST(? AS INT)" ["7"]]
+         (sql/format {:update :t :set {:v [:cast "7" :INT]}}))))
+
+(deftest test-cast-rejects-missing-type
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:cast :id nil]]}))))
+
+(deftest test-cast-rejects-bad-type
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:cast :id 42]]}))))
+
+;; ===========================================================================
+;; CASE expression
+;; ===========================================================================
+
+(deftest test-case-simple
+  (is (= ["SELECT CASE WHEN status = ? THEN ? WHEN status = ? THEN ? END FROM t"
+          ["a" "Active" "b" "Banned"]]
+         (sql/format {:select [[:case
+                                [:= :status "a"] "Active"
+                                [:= :status "b"] "Banned"]]
+                      :from [:t]}))))
+
+(deftest test-case-with-else
+  (is (= ["SELECT CASE WHEN status = ? THEN ? ELSE ? END FROM t"
+          ["a" "Active" "Unknown"]]
+         (sql/format {:select [[:case
+                                [:= :status "a"] "Active"
+                                :else "Unknown"]]
+                      :from [:t]}))))
+
+(deftest test-case-then-keyword-is-identifier
+  (is (= ["SELECT CASE WHEN status = ? THEN active_name ELSE inactive_name END FROM t"
+          ["a"]]
+         (sql/format {:select [[:case
+                                [:= :status "a"] :active_name
+                                :else :inactive_name]]
+                      :from [:t]}))))
+
+(deftest test-case-with-alias
+  (is (= ["SELECT CASE WHEN n > ? THEN ? ELSE ? END AS label FROM t" [0 "pos" "neg"]]
+         (sql/format {:select [[[:case [:> :n 0] "pos" :else "neg"] :label]]
+                      :from [:t]}))))
+
+(deftest test-case-rejects-empty
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:case]]}))))
+
+(deftest test-case-rejects-odd-pairs
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:case [:= :a 1] "x" [:= :b 2]]]}))))
+
+(deftest test-case-rejects-misplaced-else
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:case :else "x" [:= :a 1] "y"]]}))))
+
+;; ===========================================================================
+;; Window functions (:over)
+;; ===========================================================================
+
+(deftest test-over-empty
+  (is (= ["SELECT row_number() OVER () FROM t" []]
+         (sql/format {:select [[:over [:fn :row_number] {}]] :from [:t]}))))
+
+(deftest test-over-partition-by
+  (is (= ["SELECT row_number() OVER (PARTITION BY dept) FROM emp" []]
+         (sql/format {:select [[:over [:fn :row_number] {:partition-by [:dept]}]]
+                      :from [:emp]}))))
+
+(deftest test-over-order-by
+  (is (= ["SELECT rank() OVER (ORDER BY salary DESC) FROM emp" []]
+         (sql/format {:select [[:over [:fn :rank] {:order-by [[:salary :desc]]}]]
+                      :from [:emp]}))))
+
+(deftest test-over-partition-and-order
+  (is (= ["SELECT row_number() OVER (PARTITION BY dept ORDER BY salary DESC) AS rn FROM emp"
+          []]
+         (sql/format {:select [[[:over [:fn :row_number]
+                                 {:partition-by [:dept]
+                                  :order-by [[:salary :desc]]}]
+                                :rn]]
+                      :from [:emp]}))))
+
+(deftest test-over-frame-rows-unbounded-preceding
+  (is (= ["SELECT sum(amount) OVER (ORDER BY day ROWS UNBOUNDED PRECEDING) FROM t" []]
+         (sql/format {:select [[:over [:fn :sum :amount]
+                                {:order-by [:day]
+                                 :frame [:rows :unbounded-preceding]}]]
+                      :from [:t]}))))
+
+(deftest test-over-frame-rows-between
+  (is (= ["SELECT avg(x) OVER (ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) FROM t" []]
+         (sql/format {:select [[:over [:fn :avg :x]
+                                {:frame [:rows :between [:preceding 1] :and [:following 1]]}]]
+                      :from [:t]}))))
+
+(deftest test-over-frame-range-current-row
+  (is (= ["SELECT sum(x) OVER (ORDER BY t ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM s"
+          []]
+         (sql/format {:select [[:over [:fn :sum :x]
+                                {:order-by [:t]
+                                 :frame [:rows :between :unbounded-preceding :and :current-row]}]]
+                      :from [:s]}))))
+
+(deftest test-over-rejects-unknown-key
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:over [:fn :row_number] {:partition :dept}]]}))))
+
+(deftest test-over-rejects-bad-frame-token
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:over [:fn :row_number] {:frame [:wat]}]]}))))
+
+(deftest test-over-rejects-non-map-spec
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:over [:fn :row_number] [:partition :dept]]]}))))
+
+;; ===========================================================================
+;; FILTER
+;; ===========================================================================
+
+(deftest test-filter
+  (is (= ["SELECT count(*) FILTER (WHERE status = ?) AS active FROM users" ["active"]]
+         (sql/format {:select [[[:filter [:fn :count :*] [:= :status "active"]] :active]]
+                      :from [:users]}))))
+
+(deftest test-filter-with-over
+  (is (= [(str "SELECT sum(amount) FILTER (WHERE refunded = ?) "
+               "OVER (PARTITION BY user_id) FROM orders")
+          [false]]
+         (sql/format
+           {:select [[:over [:filter [:fn :sum :amount] [:= :refunded false]]
+                      {:partition-by [:user_id]}]]
+            :from [:orders]}))))
+
+;; ===========================================================================
+;; LATERAL
+;; ===========================================================================
+
+(deftest test-lateral-in-from
+  (is (= ["SELECT u.id FROM users AS u, LATERAL (SELECT max(id) FROM orders WHERE user_id = u.id) AS o"
+          []]
+         (sql/format {:select [:u/id]
+                      :from [[:users :u]
+                             [[:lateral {:select [[:fn :max :id]]
+                                         :from [:orders]
+                                         :where [:= :user_id :u/id]}]
+                              :o]]}))))
+
+(deftest test-lateral-in-join
+  (is (= ["SELECT u.id FROM users AS u JOIN LATERAL (SELECT max(id) FROM orders) AS o ON TRUE"
+          []]
+         (sql/format {:select [:u/id]
+                      :from [[:users :u]]
+                      :join [[[:lateral {:select [[:fn :max :id]] :from [:orders]}] :o]
+                             [:raw "TRUE"]]}))))
+
+(deftest test-lateral-rejects-non-subquery
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id]
+                            :from [[[:lateral :nope] :x]]}))))
+
+;; ===========================================================================
+;; NULLS FIRST / NULLS LAST
+;; ===========================================================================
+
+(deftest test-order-by-nulls-first
+  (is (= ["SELECT id FROM t ORDER BY n ASC NULLS FIRST" []]
+         (sql/format {:select [:id] :from [:t]
+                      :order-by [[:n :asc :nulls-first]]}))))
+
+(deftest test-order-by-nulls-last
+  (is (= ["SELECT id FROM t ORDER BY n DESC NULLS LAST" []]
+         (sql/format {:select [:id] :from [:t]
+                      :order-by [[:n :desc :nulls-last]]}))))
+
+(deftest test-order-by-rejects-bad-nulls
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t]
+                            :order-by [[:n :asc :sometimes]]}))))
+
+;; ===========================================================================
+;; SELECT DISTINCT ON (Postgres)
+;; ===========================================================================
+
+(deftest test-distinct-on
+  (is (= ["SELECT DISTINCT ON (country) id, name FROM users" []]
+         (sql/format {:select-distinct-on {:on [:country] :select [:id :name]}
+                      :from [:users]}))))
+
+(deftest test-distinct-on-multiple
+  (is (= ["SELECT DISTINCT ON (country, city) id, name FROM users ORDER BY country ASC, city ASC" []]
+         (sql/format {:select-distinct-on {:on [:country :city] :select [:id :name]}
+                      :from [:users]
+                      :order-by [[:country :asc] [:city :asc]]}))))
+
+(deftest test-distinct-on-rejects-no-on
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select-distinct-on {:select [:id]} :from [:t]}))))
+
+(deftest test-distinct-on-rejects-empty-on
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select-distinct-on {:on [] :select [:id]} :from [:t]}))))
+
+(deftest test-distinct-on-rejects-unknown-key
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select-distinct-on {:on [:a] :select [:id] :wat 1}
+                            :from [:t]}))))
+
+(deftest test-mutex-select-modes
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id]
+                            :select-distinct [:id]
+                            :from [:t]}))))
+
+;; ===========================================================================
+;; JOIN ... USING
+;; ===========================================================================
+
+(deftest test-join-using-single
+  (is (= ["SELECT id FROM a JOIN b USING (id)" []]
+         (sql/format {:select [:id] :from [:a]
+                      :join [:b [:using :id]]}))))
+
+(deftest test-join-using-multiple
+  (is (= ["SELECT id FROM a LEFT JOIN b USING (id, tenant_id)" []]
+         (sql/format {:select [:id] :from [:a]
+                      :left-join [:b [:using :id :tenant_id]]}))))
+
+(deftest test-join-using-rejects-empty
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:a]
+                            :join [:b [:using]]}))))
+
+;; ===========================================================================
+;; ON CONFLICT (Postgres)
+;; ===========================================================================
+
+(deftest test-on-conflict-do-nothing
+  (is (= ["INSERT INTO users (email) VALUES (?) ON CONFLICT (email) DO NOTHING" ["a@x"]]
+         (sql/format {:insert-into :users
+                      :values [{:email "a@x"}]
+                      :on-conflict [:email]
+                      :do-nothing true}))))
+
+(deftest test-on-conflict-do-update-set
+  (is (= [(str "INSERT INTO users (email, name) VALUES (?, ?) "
+               "ON CONFLICT (email) DO UPDATE SET name = ?")
+          ["a@x" "alice" "alice"]]
+         (sql/format {:insert-into :users
+                      :values [{:email "a@x" :name "alice"}]
+                      :on-conflict [:email]
+                      :do-update-set {:name "alice"}}))))
+
+(deftest test-on-conflict-on-constraint
+  (is (= ["INSERT INTO t VALUES (?) ON CONFLICT ON CONSTRAINT t_pk DO NOTHING" [1]]
+         (sql/format {:insert-into :t
+                      :values [[1]]
+                      :on-conflict {:on-constraint :t_pk}
+                      :do-nothing true}))))
+
+(deftest test-on-conflict-no-target
+  (is (= ["INSERT INTO t VALUES (?) ON CONFLICT DO NOTHING" [1]]
+         (sql/format {:insert-into :t
+                      :values [[1]]
+                      :on-conflict []
+                      :do-nothing true}))))
+
+(deftest test-on-conflict-with-partial-index-where
+  (is (= [(str "INSERT INTO t (a, b) VALUES (?, ?) "
+               "ON CONFLICT (a) WHERE active = ? DO NOTHING")
+          [1 2 true]]
+         (sql/format {:insert-into :t
+                      :values [{:a 1 :b 2}]
+                      :on-conflict [:a]
+                      :on-conflict-where [:= :active true]
+                      :do-nothing true}))))
+
+(deftest test-on-conflict-do-update-where
+  (is (= [(str "INSERT INTO t (id) VALUES (?) "
+               "ON CONFLICT (id) DO UPDATE SET id = ? WHERE active = ?")
+          [1 1 true]]
+         (sql/format {:insert-into :t
+                      :values [{:id 1}]
+                      :on-conflict [:id]
+                      :do-update-set {:id 1}
+                      :do-update-where [:= :active true]}))))
+
+(deftest test-on-conflict-rejects-do-nothing-and-update
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t
+                            :values [[1]]
+                            :on-conflict [:id]
+                            :do-nothing true
+                            :do-update-set {:id 1}}))))
+
+(deftest test-on-conflict-rejects-missing-action
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t
+                            :values [[1]]
+                            :on-conflict [:id]}))))
+
+(deftest test-on-conflict-rejects-bad-target
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t
+                            :values [[1]]
+                            :on-conflict "id"
+                            :do-nothing true}))))
+
+;; ===========================================================================
+;; ON DUPLICATE KEY UPDATE (MySQL)
+;; ===========================================================================
+
+(deftest test-on-duplicate-key-update
+  (is (= [(str "INSERT INTO users (email, name) VALUES (?, ?) "
+               "ON DUPLICATE KEY UPDATE name = ?")
+          ["a@x" "alice" "alice"]]
+         (sql/format {:insert-into :users
+                      :values [{:email "a@x" :name "alice"}]
+                      :on-duplicate-key-update {:name "alice"}}))))
+
+(deftest test-on-duplicate-key-update-with-raw
+  (is (= [(str "INSERT INTO users (email, name) VALUES (?, ?) "
+               "ON DUPLICATE KEY UPDATE name = VALUES(name)")
+          ["a@x" "alice"]]
+         (sql/format {:insert-into :users
+                      :values [{:email "a@x" :name "alice"}]
+                      :on-duplicate-key-update {:name [:raw "VALUES(name)"]}}))))
+
+(deftest test-on-duplicate-key-update-rejects-empty
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t
+                            :values [[1]]
+                            :on-duplicate-key-update {}}))))
+
+(deftest test-conflict-and-odku-mutex
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t
+                            :values [[1]]
+                            :on-conflict [:id]
+                            :do-nothing true
+                            :on-duplicate-key-update {:x 1}}))))
+
+;; ===========================================================================
+;; Top-level VALUES
+;; ===========================================================================
+
+(deftest test-top-level-values-vector-rows
+  (is (= ["VALUES (?, ?), (?, ?)" [1 "a" 2 "b"]]
+         (sql/format {:values [[1 "a"] [2 "b"]]}))))
+
+(deftest test-top-level-values-rejects-extra-keys
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:values [[1]] :limit 5}))))
+
+;; ===========================================================================
+;; IN / BETWEEN now route through operand: expressions on either side
+;; ===========================================================================
+
+(deftest test-in-with-fn-lhs
+  (is (= ["SELECT id FROM t WHERE lower(name) IN (?, ?)" ["a" "b"]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:in [:fn :lower :name] ["a" "b"]]}))))
+
+(deftest test-between-with-fn-lhs
+  (is (= ["SELECT id FROM t WHERE abs(n) BETWEEN ? AND ?" [1 10]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:between [:fn :abs :n] 1 10]}))))
+
+(deftest test-is-null-with-fn
+  (is (= ["SELECT id FROM t WHERE coalesce(a, b) IS NULL" []]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:is-null [:fn :coalesce :a :b]]}))))
+
+;; ===========================================================================
+;; Mega round-trip (everything together)
+;; ===========================================================================
+
+(deftest test-everything-with-window-and-case
+  (is (= [(str "WITH active AS (SELECT id FROM users WHERE deleted_at IS NULL) "
+               "SELECT u.id, "
+               "row_number() OVER (PARTITION BY u.dept ORDER BY u.salary DESC) AS rk, "
+               "CASE WHEN u.salary > ? THEN ? ELSE ? END AS tier "
+               "FROM users AS u "
+               "JOIN active AS a USING (id) "
+               "WHERE u.status = ? "
+               "ORDER BY u.dept ASC NULLS LAST")
+          [100000 "high" "low" "active"]]
+         (sql/format
+           {:with [[:active {:select [:id] :from [:users]
+                             :where [:is-null :deleted_at]}]]
+            :select [:u/id
+                     [[:over [:fn :row_number]
+                       {:partition-by [:u/dept]
+                        :order-by [[:u/salary :desc]]}]
+                      :rk]
+                     [[:case [:> :u/salary 100000] "high" :else "low"] :tier]]
+            :from [[:users :u]]
+            :join [[:active :a] [:using :id]]
+            :where [:= :u/status "active"]
+            :order-by [[:u/dept :asc :nulls-last]]}))))

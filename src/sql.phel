@@ -431,6 +431,8 @@
       (when (empty? cols)
         (bad-arg "join :using expects at least one column"))
       [(str "USING (" (str/join ", " (map ident cols)) ")") []])
+    (tagged? on)
+    (prefixed "ON" (emit-tagged on))
     :else
     (prefixed "ON" (emit-where on))))
 
