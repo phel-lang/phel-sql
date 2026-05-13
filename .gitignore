@@ -8,3 +8,4 @@ composer.lock
 *.cache
 .phel-repl-history
 phel-config-local.php
+.claude/settings.local.json
