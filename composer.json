@@ -8,10 +8,16 @@
     "query-builder",
     "honeysql"
   ],
+  "authors": [
+    {
+      "name": "Jose M. Valera Reales",
+      "email": "phel@chemaclass.es",
+      "homepage": "https://chemaclass.com"
+    }
+  ],
   "homepage": "https://phel-lang.org/",
   "license": "MIT",
   "type": "library",
-  "minimum-stability": "dev",
   "prefer-stable": true,
   "require": {
     "php": ">=8.4",

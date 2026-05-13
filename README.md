@@ -81,7 +81,3 @@ Subqueries (maps) work anywhere an identifier or value is accepted. `[:raw "SQL"
 - [Expressions](docs/expressions.md): function calls, CAST, CASE, window, FILTER, LATERAL.
 - [Parameters](docs/parameters.md): keywords vs values, subqueries, raw fragments.
 - [Contributing](docs/contributing.md): repo layout, tests, adding a clause.
-
-## License
-
-MIT
