@@ -1,0 +1,185 @@
+(ns phel-sql\sql
+  (:require phel.string :as str))
+
+;; ---------------------------------------------------------------------------
+;; Identifier rendering
+;; ---------------------------------------------------------------------------
+
+(defn- bad-arg [msg]
+  (throw (php/new \InvalidArgumentException msg)))
+
+(defn- ident
+  "Render an identifier. Accepts:
+    - keyword         -> bare name (qualified keyword -> 'schema.name')
+    - [base alias]    -> 'base AS alias'
+    - string          -> literal escape hatch (already rendered)"
+  [x]
+  (cond
+    (keyword? x) (if-let [ns (namespace x)]
+                   (str ns "." (name x))
+                   (name x))
+    (vector? x)  (let [[base alias] x]
+                   (str (ident base) " AS " (ident alias)))
+    (string? x)  x
+    :else (bad-arg (str "Unsupported identifier: " (php/var_export x true)))))
+
+(defn- idents [xs]
+  (str/join ", " (map ident xs)))
+
+;; ---------------------------------------------------------------------------
+;; Where rendering. Each emitter returns [sql params].
+;; ---------------------------------------------------------------------------
+
+(def- binary-ops
+  {:= "=" :!= "!=" :< "<" :> ">" :<= "<=" :>= ">=" :like "LIKE"})
+
+(declare emit-where)
+
+(defn- operand
+  "Keyword operands render as identifiers; everything else becomes a `?` param."
+  [x]
+  (if (keyword? x)
+    [(ident x) []]
+    ["?" [x]]))
+
+(defn- emit-binary [op-sql args]
+  (let [[lhs rhs] args
+        [l-sql l-params] (operand lhs)
+        [r-sql r-params] (operand rhs)]
+    [(str l-sql " " op-sql " " r-sql)
+     (concat l-params r-params)]))
+
+(defn- emit-logical [joiner clauses]
+  (when (empty? clauses)
+    (bad-arg (str joiner " expects at least one clause")))
+  (let [parts (map emit-where clauses)
+        sqls (map (fn [[s _]] (str "(" s ")")) parts)
+        params (apply concat (map (fn [[_ p]] p) parts))]
+    [(str/join (str " " joiner " ") sqls) params]))
+
+(defn- emit-in [args]
+  (let [[col vs] args]
+    (when-not (and (vector? vs) (seq vs))
+      (bad-arg "in expects a non-empty vector of values"))
+    [(str (ident col) " IN (" (str/join ", " (map (fn [_] "?") vs)) ")")
+     (vec vs)]))
+
+(defn- emit-between [args]
+  (let [[col lo hi] args]
+    [(str (ident col) " BETWEEN ? AND ?") [lo hi]]))
+
+(defn- emit-null [col negate?]
+  [(str (ident col) (if negate? " IS NOT NULL" " IS NULL")) []])
+
+(defn- emit-not [args]
+  (let [[s p] (emit-where (first args))]
+    [(str "NOT (" s ")") p]))
+
+(defn- emit-where [clause]
+  (when-not (vector? clause)
+    (bad-arg (str "where clause must be a vector, got: " (php/var_export clause true))))
+  (let [[op & args] clause]
+    (cond
+      (= op :and) (emit-logical "AND" args)
+      (= op :or)  (emit-logical "OR" args)
+      (= op :not) (emit-not args)
+      (= op :in)  (emit-in args)
+      (= op :between) (emit-between args)
+      (= op :is-null) (emit-null (first args) false)
+      (= op :is-not-null) (emit-null (first args) true)
+      (contains? binary-ops op) (emit-binary (get binary-ops op) args)
+      :else (bad-arg (str "Unknown where operator: " (php/var_export op true))))))
+
+;; ---------------------------------------------------------------------------
+;; Clause emitters
+;; ---------------------------------------------------------------------------
+
+(defn- emit-order-item [item]
+  (cond
+    (keyword? item) (ident item)
+    (vector? item)  (let [[col dir] item]
+                      (str (ident col) " "
+                           (case dir
+                             :asc "ASC"
+                             :desc "DESC"
+                             (bad-arg (str "order direction must be :asc or :desc, got: "
+                                           (php/var_export dir true))))))
+    :else (bad-arg (str "Unsupported order-by item: " (php/var_export item true)))))
+
+(defn- non-neg-int! [n clause]
+  (when-not (and (int? n) (>= n 0))
+    (bad-arg (str clause " must be a non-negative integer, got: " (php/var_export n true)))))
+
+(defn- emit-select [cols]
+  [(str "SELECT " (idents cols)) []])
+
+(defn- emit-from [tables]
+  [(str "FROM " (idents tables)) []])
+
+(defn- emit-where-clause [w]
+  (let [[sql params] (emit-where w)]
+    [(str "WHERE " sql) params]))
+
+(defn- emit-order-by [items]
+  [(str "ORDER BY " (str/join ", " (map emit-order-item items))) []])
+
+(defn- emit-limit [n]
+  (non-neg-int! n "limit")
+  [(str "LIMIT " n) []])
+
+(defn- emit-offset [n]
+  (non-neg-int! n "offset")
+  [(str "OFFSET " n) []])
+
+;; ---------------------------------------------------------------------------
+;; Dispatch
+;; ---------------------------------------------------------------------------
+
+(def- clause-emitters
+  {:select   emit-select
+   :from     emit-from
+   :where    emit-where-clause
+   :order-by emit-order-by
+   :limit    emit-limit
+   :offset   emit-offset})
+
+(def- clause-order
+  [:select :from :where :order-by :limit :offset])
+
+(def- known-clauses (set clause-order))
+
+(defn- unknown-clauses [query]
+  (filter (fn [k] (not (contains? known-clauses k))) (keys query)))
+
+(defn format
+  "Compile a data-driven SQL map into a `[sql params]` tuple. Pure: no I/O.
+
+  Clauses (emitted in this order):
+    :select   vector of columns (keyword or [col alias])
+    :from     vector of tables (keyword or [table alias])
+    :where    vector clause [op & args] (see docs/parameters.md)
+    :order-by vector of items (keyword or [col :asc|:desc])
+    :limit    non-negative integer
+    :offset   non-negative integer
+
+  Throws InvalidArgumentException on unknown clauses or malformed data."
+  {:example "(format {:select [:id :name] :from [:users] :where [:= :status \"active\"]})
+            ; => [\"SELECT id, name FROM users WHERE status = ?\" [\"active\"]]"
+   :see-also []}
+  [query]
+  (when-not (map? query)
+    (bad-arg (str "format expects a map, got: " (php/var_export query true))))
+  (let [unknown (unknown-clauses query)]
+    (when (seq unknown)
+      (bad-arg (str "Unknown clause(s): " (str/join ", " (map name unknown))))))
+  (let [[sqls params]
+        (reduce
+         (fn [[sqls params] clause]
+           (if (contains? query clause)
+             (let [emit (get clause-emitters clause)
+                   [s p] (emit (get query clause))]
+               [(conj sqls s) (concat params p)])
+             [sqls params]))
+         [[] []]
+         clause-order)]
+    [(str/join " " sqls) (vec params)]))
