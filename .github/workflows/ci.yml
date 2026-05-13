@@ -1,4 +1,4 @@
-on: [push]
+on: [push, pull_request]
 
 name: CI
 
@@ -29,14 +29,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-php${{ matrix.php }}-composer-${{ hashFiles('**/composer.lock') }}
+          key: ${{ runner.os }}-php${{ matrix.php }}-composer-${{ hashFiles('composer.json') }}
           restore-keys: ${{ runner.os }}-php${{ matrix.php }}-composer-
 
       - name: Install dependencies
         run: composer install --no-interaction --no-ansi --no-progress
 
       - name: Run phel tests
-        run: vendor/bin/phel test
-
-      - name: Build standalone binary
-        run: vendor/bin/phel build --no-cache
+        run: composer test
