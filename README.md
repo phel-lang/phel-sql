@@ -1,117 +1,59 @@
-# Phel CLI Skeleton
+# phel-sql
 
-[Phel](https://phel-lang.org/) is a functional Lisp that compiles to PHP. This
-repository is a minimal, opinionated starting point for building a real **CLI
-application** with Phel.
+Data-driven SQL DSL for [Phel Lang](https://phel-lang.org/). Map in, `[sql params]` out. No database driver: the only job here is turning data into a parameterised query string.
 
-It ships:
+Inspired by [HoneySQL](https://github.com/seancorfield/honeysql).
 
-- A data-driven command dispatcher built on top of [`phel\cli`](https://phel-lang.org/)
-  (a thin wrapper over `symfony/console`) with two sample subcommands:
-  `greet` and `add`.
-- An exportable Phel module (`adder-module`) consumed from PHP via the
-  auto-generated `PhelGenerated\CliSkeleton\Modules\AdderModule` class.
-- Tests that exercise both pure logic and the CLI handler boundary using
-  `phel\cli`'s built-in test helpers.
+```phel
+(sql/format
+  {:select [:id :name]
+   :from   [:users]
+   :where  [:= :status "active"]})
+;; => ["SELECT id, name FROM users WHERE status = ?" ["active"]]
+```
 
-## Requirements
-
-- PHP **>= 8.4** ([phpbrew](https://github.com/phpbrew/phpbrew) on Linux,
-  [shivammathur/homebrew-php](https://github.com/shivammathur/homebrew-php) on macOS)
-- [Composer](https://getcomposer.org/)
-
-> A `build/Dockerfile` and `docker-compose.yml` are included if you'd rather not
-> install PHP locally.
-
-## Getting started
+## Install
 
 ```bash
-git clone <this repo>
-cd cli-skeleton
-composer install
+composer require phel-lang/phel-sql
 ```
 
-### Run the CLI from sources
+Requires PHP 8.4+ and `phel-lang/phel-lang` 0.37+.
 
-```bash
-composer dev                          # invoke default command (greet)
-vendor/bin/phel run cli-skeleton.main greet alice --loud
-vendor/bin/phel run cli-skeleton.main add 1 2 3
+## Use it
+
+```phel
+(ns my-app\queries
+  (:require phel-sql\sql :as sql))
+
+(sql/format
+  {:select   [:id :name]
+   :from     [:users]
+   :where    [:and [:= :status "active"] [:>= :age 18]]
+   :order-by [[:name :asc]]
+   :limit    10})
+;; => ["SELECT id, name FROM users WHERE (status = ?) AND (age >= ?) ORDER BY name ASC LIMIT 10"
+;;     ["active" 18]]
 ```
 
-### Compile a standalone PHP code
+Pass the tuple to any PDO-like driver:
 
-```bash
-composer build                        # → out/main.php
-php out/main.php greet alice
-php out/main.php add 1 2 3
+```php
+$pdo->prepare($sql)->execute($params);
 ```
 
-### Run the tests
+## Docs
 
-```bash
-composer test
-```
+- [Quickstart](docs/quickstart.md): three queries, end to end.
+- [Clauses](docs/clauses.md): every supported clause and its shape.
+- [Parameters](docs/parameters.md): how identifiers, values, and `?` placeholders interact.
+- [Contributing](docs/contributing.md): repo layout, tests, adding a clause.
 
-### Format
+## Status
 
-```bash
-composer format
-```
+MVP. Supported: `select`, `from`, `where`, `order-by`, `limit`, `offset`.
+Planned: `join`, `group-by`, `having`, `with`.
 
-### REPL
+## License
 
-```bash
-composer repl
-```
-
-## Project layout
-
-```
-src/
-├── main.phel                         ; wires the Application + dispatches
-├── commands/
-│   ├── greet.phel                    ; subcommand: greet
-│   └── adder.phel                    ; subcommand: add
-├── modules/
-│   └── adder-module.phel             ; pure logic, exported to PHP
-└── PhelGenerated/                    ; auto-generated PHP wrappers
-tests/
-├── commands/                         ; CLI handler smoke tests
-└── modules/                          ; pure unit tests
-example/
-└── using-exported-phel-function.php  ; call a Phel fn from PHP
-phel-config.php                       ; build / export / format config
-```
-
-### Adding a new command
-
-1. Create `src/commands/<name>.phel` exposing a `def <name>-command` map (see
-   `greet.phel` for the spec — `phel\cli` docs at
-   `vendor/phel-lang/phel-lang/docs/cli-guide.md` cover every option).
-2. Register it in `src/main.phel` by adding it to the `:commands` vector.
-3. Drop a test in `tests/commands/<name>-test.phel` (use `cli/argv` +
-   `cli/buffered-output` to drive the handler in-process).
-
-### Exporting Phel functions to PHP
-
-Mark a function with `{:export true}` (see `src/modules/adder-module.phel`),
-then run:
-
-```bash
-composer export    # regenerates src/PhelGenerated/**
-php example/using-exported-phel-function.php
-```
-
-## Docker
-
-```bash
-docker compose up -d --build
-docker exec -ti -u dev phel_cli_skeleton bash
-composer install
-```
-
-## More
-
-- Phel docs: <https://phel-lang.org/documentation/getting-started/>
-- `phel\cli` guide: `vendor/phel-lang/phel-lang/docs/cli-guide.md`
+MIT
