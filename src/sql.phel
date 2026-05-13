@@ -2,7 +2,7 @@
   (:require phel.string :as str))
 
 ;; ===========================================================================
-;; Errors / helpers
+;; Errors / shared helpers
 ;; ===========================================================================
 
 (defn- bad-arg [msg]
@@ -10,26 +10,34 @@
 
 (defn- show [x] (php/var_export x true))
 
-(defn- params-of [fragments]
-  "Concatenate the params component of a sequence of [sql params] tuples."
-  (mapcat (fn [[_ p]] p) fragments))
+(defn- params-of [fragments] (mapcat (fn [[_ p]] p) fragments))
+(defn- sqls-of   [fragments] (map first fragments))
 
-(defn- sqls-of [fragments]
-  (map first fragments))
+(defn- prefixed [prefix [sql params]]
+  [(str prefix " " sql) params])
 
 ;; ===========================================================================
-;; Forward declarations (mutually recursive: where <-> subquery <-> format)
+;; Forward declarations (mutually recursive: where <-> expr <-> compile)
 ;; ===========================================================================
 
-(declare emit-where [clause])
+(declare emit-where    [clause])
 (declare compile-query [query])
+(declare operand       [x])
+(declare ident+        [x])
 
 ;; ===========================================================================
-;; Identifier rendering
+;; Tagged expression forms
 ;; ===========================================================================
+
+(def- expr-tags #{:raw :fn :cast :case :over :filter :lateral})
 
 (defn- subquery? [x] (map? x))
+(defn- tagged? [x] (and (vector? x) (keyword? (first x)) (contains? expr-tags (first x))))
 (defn- raw? [x] (and (vector? x) (= :raw (first x)) (= 2 (count x))))
+
+;; ===========================================================================
+;; Plain identifiers
+;; ===========================================================================
 
 (defn- ident
   "Render a plain identifier (no params, no subquery).
@@ -43,14 +51,165 @@
     (string? x)  x
     :else (bad-arg (str "Unsupported identifier: " (show x)))))
 
+;; ===========================================================================
+;; Function calls, CAST, CASE, OVER, FILTER, LATERAL
+;; ===========================================================================
+
+(defn- emit-fn-call [[_ fname & args]]
+  (when-not (or (keyword? fname) (string? fname))
+    (bad-arg (str "fn expects a keyword or string function name, got: " (show fname))))
+  (let [parts (map operand args)]
+    [(str (ident fname) "(" (str/join ", " (sqls-of parts)) ")")
+     (params-of parts)]))
+
+(defn- emit-cast [[_ x type-spec]]
+  (when (nil? type-spec)
+    (bad-arg "cast expects [:cast expr type]"))
+  (let [[s p] (operand x)
+        type-sql (cond
+                   (keyword? type-spec) (name type-spec)
+                   (string? type-spec)  type-spec
+                   :else (bad-arg (str "cast type must be a keyword or string, got: " (show type-spec))))]
+    [(str "CAST(" s " AS " type-sql ")") p]))
+
+(defn- split-case-args
+  "Walk case args, collecting [test then] pairs until we hit :else, then take
+   the final default. Returns [pairs default-or-nil]."
+  [args]
+  (loop [remaining args
+         pairs []
+         default nil]
+    (cond
+      (empty? remaining) [pairs default]
+
+      (= (first remaining) :else)
+      (do
+        (when (not= (count remaining) 2)
+          (bad-arg "case :else must be followed by exactly one default value at the end"))
+        [pairs (second remaining)])
+
+      (< (count remaining) 2)
+      (bad-arg "case expects pairs of [test then]")
+
+      :else
+      (recur (drop 2 remaining)
+             (conj pairs [(first remaining) (second remaining)])
+             default))))
+
+(defn- emit-case [[_ & args]]
+  (let [[pairs default] (split-case-args args)]
+    (when (zero? (count pairs))
+      (bad-arg "case requires at least one [test then] pair"))
+    (let [pair-fragments
+          (for [[test then] :in pairs]
+            (let [[t-sql t-p] (emit-where test)
+                  [v-sql v-p] (operand then)]
+              [(str "WHEN " t-sql " THEN " v-sql)
+               (concat t-p v-p)]))
+          else-fragment (when-not (nil? default)
+                          (let [[s p] (operand default)]
+                            [(str "ELSE " s) p]))
+          all (if else-fragment
+                (concat pair-fragments [else-fragment])
+                pair-fragments)]
+      [(str "CASE " (str/join " " (sqls-of all)) " END")
+       (params-of all)])))
+
+(def- frame-tokens
+  {:rows                "ROWS"
+   :range               "RANGE"
+   :groups              "GROUPS"
+   :between             "BETWEEN"
+   :and                 "AND"
+   :unbounded-preceding "UNBOUNDED PRECEDING"
+   :current-row         "CURRENT ROW"
+   :unbounded-following "UNBOUNDED FOLLOWING"
+   :exclude-no-others   "EXCLUDE NO OTHERS"
+   :exclude-current-row "EXCLUDE CURRENT ROW"
+   :exclude-group       "EXCLUDE GROUP"
+   :exclude-ties        "EXCLUDE TIES"})
+
+(defn- emit-frame-token [t]
+  (cond
+    (keyword? t) (or (get frame-tokens t)
+                     (bad-arg (str "Unknown frame token: " (show t))))
+    (and (vector? t) (= 2 (count t)) (int? (second t)))
+    (case (first t)
+      :preceding (str (second t) " PRECEDING")
+      :following (str (second t) " FOLLOWING")
+      (bad-arg (str "Unknown frame modifier: " (show (first t)))))
+    :else (bad-arg (str "Unsupported frame token: " (show t)))))
+
+(defn- emit-frame [tokens]
+  (when-not (and (vector? tokens) (seq tokens))
+    (bad-arg ":frame expects a non-empty vector of tokens"))
+  (str/join " " (map emit-frame-token tokens)))
+
+(declare emit-order-fragments [items])
+
+(defn- emit-window-spec [m]
+  (when-not (map? m)
+    (bad-arg (str "over expects a window-spec map, got: " (show m))))
+  (let [allowed #{:partition-by :order-by :frame}
+        unknown (filter (fn [k] (not (contains? allowed k))) (keys m))]
+    (when (seq unknown)
+      (bad-arg (str "Unknown window-spec key(s): " (str/join ", " (map name unknown))))))
+  (let [pieces (atom [])
+        params (atom [])
+        push! (fn [s p]
+                (swap! pieces conj s)
+                (reset! params (concat (deref params) p)))]
+    (when (contains? m :partition-by)
+      (let [cols (get m :partition-by)
+            parts (map ident+ cols)]
+        (push! (str "PARTITION BY " (str/join ", " (sqls-of parts)))
+               (params-of parts))))
+    (when (contains? m :order-by)
+      (let [[s p] (emit-order-fragments (get m :order-by))]
+        (push! (str "ORDER BY " s) p)))
+    (when (contains? m :frame)
+      (push! (emit-frame (get m :frame)) []))
+    [(str/join " " (deref pieces)) (vec (deref params))]))
+
+(defn- emit-over [[_ x window-spec]]
+  (let [[e-sql e-params] (operand x)
+        [w-sql w-params] (emit-window-spec window-spec)]
+    [(str e-sql " OVER (" w-sql ")") (concat e-params w-params)]))
+
+(defn- emit-filter-expr [[_ x where]]
+  (let [[e-sql e-params] (operand x)
+        [w-sql w-params] (emit-where where)]
+    [(str e-sql " FILTER (WHERE " w-sql ")") (concat e-params w-params)]))
+
+(defn- emit-lateral [[_ q]]
+  (when-not (subquery? q)
+    (bad-arg "lateral expects a subquery map"))
+  (let [[s p] (compile-query q)]
+    [(str "LATERAL (" s ")") p]))
+
+(defn- emit-tagged [x]
+  (case (first x)
+    :raw     [(second x) []]
+    :fn      (emit-fn-call x)
+    :cast    (emit-cast x)
+    :case    (emit-case x)
+    :over    (emit-over x)
+    :filter  (emit-filter-expr x)
+    :lateral (emit-lateral x)))
+
+;; ===========================================================================
+;; ident+ and operand share expression handling, differ on the leaf.
+;; ===========================================================================
+
 (defn- ident+
   "Identifier with optional params. Accepts everything `ident` does, plus
-    [:raw \"SQL\"]   -> raw SQL fragment, no params
-    [base alias]    -> 'base AS alias'  (base may be a subquery map or raw)
+    [:raw ...] / [:fn ...] / [:cast ...] / [:case ...] / [:over ...] /
+    [:filter ...] / [:lateral ...]  -> tagged expression
+    [base alias]    -> 'base AS alias'  (base may be any of the above or a subquery)
     subquery map    -> '(...)'"
   [x]
   (cond
-    (raw? x)      [(second x) []]
+    (tagged? x)   (emit-tagged x)
     (subquery? x) (let [[s p] (compile-query x)] [(str "(" s ")") p])
     (vector? x)
     (let [[base alias] x
@@ -61,6 +220,19 @@
 (defn- idents+ [xs]
   (let [parts (map ident+ xs)]
     [(str/join ", " (sqls-of parts)) (params-of parts)]))
+
+(defn- operand
+  "Used in value positions (where RHS, set RHS, fn arg, etc):
+   keyword     -> identifier
+   tagged form -> dispatched
+   subquery    -> '(...)'
+   anything    -> '?' (bound)."
+  [x]
+  (cond
+    (keyword? x)  [(ident x) []]
+    (tagged? x)   (emit-tagged x)
+    (subquery? x) (let [[s p] (compile-query x)] [(str "(" s ")") p])
+    :else         ["?" [x]]))
 
 ;; ===========================================================================
 ;; WHERE
@@ -78,18 +250,6 @@
    :ilike    "ILIKE"
    :not-ilike "NOT ILIKE"})
 
-(defn- operand
-  "Keyword       -> identifier, no params.
-   [:raw \"SQL\"] -> raw SQL fragment, no params.
-   Subquery map  -> '(...)' + subquery params.
-   Anything else -> '?' + [value]."
-  [x]
-  (cond
-    (keyword? x)  [(ident x) []]
-    (raw? x)      [(second x) []]
-    (subquery? x) (let [[s p] (compile-query x)] [(str "(" s ")") p])
-    :else         ["?" [x]]))
-
 (defn- emit-binary [op-sql args]
   (let [[lhs rhs] args
         [l-sql l-params] (operand lhs)
@@ -106,26 +266,33 @@
 
 (defn- emit-in [args negate?]
   (let [[col vs] args
-        kw (if negate? "NOT IN" "IN")]
+        kw (if negate? "NOT IN" "IN")
+        [c-sql c-params] (operand col)]
     (cond
       (subquery? vs)
       (let [[s p] (compile-query vs)]
-        [(str (ident col) " " kw " (" s ")") p])
+        [(str c-sql " " kw " (" s ")") (concat c-params p)])
 
       (and (vector? vs) (seq vs))
-      [(str (ident col) " " kw " (" (str/join ", " (map (fn [_] "?") vs)) ")")
-       (vec vs)]
+      (let [parts (map operand vs)]
+        [(str c-sql " " kw " (" (str/join ", " (sqls-of parts)) ")")
+         (concat c-params (params-of parts))])
 
       :else
       (bad-arg "in/not-in expects a non-empty vector of values or a subquery map"))))
 
 (defn- emit-between [args negate?]
   (let [[col lo hi] args
-        kw (if negate? "NOT BETWEEN" "BETWEEN")]
-    [(str (ident col) " " kw " ? AND ?") [lo hi]]))
+        kw (if negate? "NOT BETWEEN" "BETWEEN")
+        [c-sql c-params] (operand col)
+        [lo-sql lo-params] (operand lo)
+        [hi-sql hi-params] (operand hi)]
+    [(str c-sql " " kw " " lo-sql " AND " hi-sql)
+     (concat c-params lo-params hi-params)]))
 
 (defn- emit-null [col negate?]
-  [(str (ident col) (if negate? " IS NOT NULL" " IS NULL")) []])
+  (let [[s p] (operand col)]
+    [(str s (if negate? " IS NOT NULL" " IS NULL")) p]))
 
 (defn- emit-not [args]
   (let [[s p] (emit-where (first args))]
@@ -160,11 +327,40 @@
         (bad-arg (str "Unknown where operator: " (show op)))))))
 
 ;; ===========================================================================
-;; Simple clauses (one keyword -> one prefix)
+;; ORDER BY (used by clause emitter + window spec)
 ;; ===========================================================================
 
-(defn- prefixed [prefix [sql params]]
-  [(str prefix " " sql) params])
+(defn- emit-order-item [item]
+  (cond
+    (or (keyword? item) (raw? item) (tagged? item))
+    (ident+ item)
+
+    (vector? item)
+    (let [[col dir nulls] item
+          dir-sql (case dir
+                    :asc  "ASC"
+                    :desc "DESC"
+                    (bad-arg (str "order direction must be :asc or :desc, got: " (show dir))))
+          nulls-sql (when nulls
+                      (case nulls
+                        :nulls-first "NULLS FIRST"
+                        :nulls-last  "NULLS LAST"
+                        (bad-arg (str "nulls modifier must be :nulls-first or :nulls-last, got: " (show nulls)))))
+          [c-sql c-params] (ident+ col)]
+      [(str c-sql " " dir-sql (when nulls-sql (str " " nulls-sql))) c-params])
+
+    :else (bad-arg (str "Unsupported order-by item: " (show item)))))
+
+(defn- emit-order-fragments [items]
+  (let [parts (map emit-order-item items)]
+    [(str/join ", " (sqls-of parts)) (params-of parts)]))
+
+(defn- emit-order-by [items]
+  (prefixed "ORDER BY" (emit-order-fragments items)))
+
+;; ===========================================================================
+;; Simple clauses
+;; ===========================================================================
 
 (defn- emit-select          [cols]  (prefixed "SELECT" (idents+ cols)))
 (defn- emit-select-distinct [cols]  (prefixed "SELECT DISTINCT" (idents+ cols)))
@@ -174,29 +370,27 @@
 (defn- emit-where-clause    [w]     (prefixed "WHERE"  (emit-where w)))
 (defn- emit-having-clause   [w]     (prefixed "HAVING" (emit-where w)))
 
+(defn- emit-select-distinct-on [spec]
+  (when-not (map? spec)
+    (bad-arg ":select-distinct-on expects {:on [...] :select [...]}"))
+  (let [on-cols  (get spec :on)
+        sel-cols (get spec :select)
+        allowed  #{:on :select}
+        unknown  (filter (fn [k] (not (contains? allowed k))) (keys spec))]
+    (when (seq unknown)
+      (bad-arg (str "Unknown :select-distinct-on key(s): " (str/join ", " (map name unknown)))))
+    (when-not (and (vector? on-cols) (seq on-cols))
+      (bad-arg ":select-distinct-on requires a non-empty :on vector"))
+    (when-not (and (vector? sel-cols) (seq sel-cols))
+      (bad-arg ":select-distinct-on requires a non-empty :select vector"))
+    (let [[on-sql on-params] (idents+ on-cols)
+          [sel-sql sel-params] (idents+ sel-cols)]
+      [(str "SELECT DISTINCT ON (" on-sql ") " sel-sql)
+       (concat on-params sel-params)])))
+
 ;; ===========================================================================
-;; ORDER BY / LIMIT / OFFSET / FOR
+;; LIMIT / OFFSET / FOR
 ;; ===========================================================================
-
-(defn- emit-order-item [item]
-  (cond
-    (or (keyword? item) (raw? item))
-    (ident+ item)
-
-    (vector? item)
-    (let [[col dir] item
-          dir-sql (case dir
-                    :asc  "ASC"
-                    :desc "DESC"
-                    (bad-arg (str "order direction must be :asc or :desc, got: " (show dir))))
-          [c-sql c-params] (ident+ col)]
-      [(str c-sql " " dir-sql) c-params])
-
-    :else (bad-arg (str "Unsupported order-by item: " (show item)))))
-
-(defn- emit-order-by [items]
-  (let [parts (map emit-order-item items)]
-    [(str "ORDER BY " (str/join ", " (sqls-of parts))) (params-of parts)]))
 
 (defn- non-neg-int! [n clause]
   (when-not (and (int? n) (>= n 0))
@@ -227,8 +421,18 @@
     [(if lock-sql (str "FOR " mode-sql " " lock-sql) (str "FOR " mode-sql)) []]))
 
 ;; ===========================================================================
-;; JOIN family
+;; JOIN family (ON clause vs USING clause)
 ;; ===========================================================================
+
+(defn- emit-join-on [on]
+  (cond
+    (and (vector? on) (= (first on) :using))
+    (let [cols (rest on)]
+      (when (empty? cols)
+        (bad-arg "join :using expects at least one column"))
+      [(str "USING (" (str/join ", " (map ident cols)) ")") []])
+    :else
+    (prefixed "ON" (emit-where on))))
 
 (defn- emit-join-list [kw pairs]
   (when-not (and (vector? pairs) (pos? (count pairs)) (even? (count pairs)))
@@ -237,8 +441,8 @@
                       (partition 2)
                       (map (fn [[table on]]
                              (let [[t-sql t-params] (ident+ table)
-                                   [o-sql o-params] (emit-where on)]
-                               [(str kw " " t-sql " ON " o-sql)
+                                   [o-sql o-params] (emit-join-on on)]
+                               [(str kw " " t-sql " " o-sql)
                                 (concat t-params o-params)]))))]
     [(str/join " " (sqls-of compiled)) (params-of compiled)]))
 
@@ -301,8 +505,8 @@
 
 (defn- normalise-values
   "Returns {:columns-sql ... :values-sql ... :params [...]}.
-  For map rows, columns are the union of keys (alphabetical for stability)
-  and columns-sql is included. For vector rows, columns-sql is nil."
+   For map rows, columns are the union of keys (alphabetical for stability)
+   and columns-sql is included. For vector rows, columns-sql is nil."
   [vs]
   (when-not (and (vector? vs) (seq vs))
     (bad-arg "values expects a non-empty vector"))
@@ -327,32 +531,98 @@
     (bad-arg "values items must all be vectors or all be maps")))
 
 ;; ===========================================================================
+;; ON CONFLICT (Postgres)
+;; ===========================================================================
+
+(defn- emit-on-conflict-target [target]
+  (cond
+    (or (nil? target) (and (vector? target) (empty? target)))
+    [""  []]
+
+    (and (vector? target) (every? keyword? target))
+    [(str " (" (str/join ", " (map ident target)) ")") []]
+
+    (and (map? target) (contains? target :on-constraint))
+    [(str " ON CONSTRAINT " (ident (get target :on-constraint))) []]
+
+    :else
+    (bad-arg (str ":on-conflict target must be a vector of columns or {:on-constraint name}, got: "
+                  (show target)))))
+
+(defn- emit-on-conflict-block [query]
+  (when (contains? query :on-conflict)
+    (let [target (get query :on-conflict)
+          [target-sql target-params] (emit-on-conflict-target target)
+          where-sql (when (contains? query :on-conflict-where)
+                      (emit-where (get query :on-conflict-where)))
+          do-nothing? (get query :do-nothing)
+          do-update (get query :do-update-set)
+          do-update-where (get query :do-update-where)]
+      (when (and do-nothing? do-update)
+        (bad-arg ":do-nothing and :do-update-set are mutually exclusive"))
+      (when (and (contains? query :on-conflict-where) (not (contains? query :on-conflict)))
+        (bad-arg ":on-conflict-where requires :on-conflict"))
+      (let [head (str "ON CONFLICT" target-sql
+                      (when where-sql (str " WHERE " (first where-sql))))
+            head-params (concat target-params (if where-sql (second where-sql) []))]
+        (cond
+          do-nothing?
+          [(str head " DO NOTHING") head-params]
+
+          do-update
+          (let [[set-sql set-params] (emit-set do-update)
+                upd-where (when do-update-where (emit-where do-update-where))]
+            [(str head " DO UPDATE " set-sql
+                  (when upd-where (str " WHERE " (first upd-where))))
+             (concat head-params set-params (if upd-where (second upd-where) []))])
+
+          :else
+          (bad-arg ":on-conflict requires :do-nothing or :do-update-set"))))))
+
+;; ===========================================================================
+;; ON DUPLICATE KEY UPDATE (MySQL)
+;; ===========================================================================
+
+(defn- emit-on-duplicate-key-update [m]
+  (when-not (map? m)
+    (bad-arg ":on-duplicate-key-update expects a map"))
+  (when (zero? (count m))
+    (bad-arg ":on-duplicate-key-update map must not be empty"))
+  (let [parts (map (fn [k]
+                     (let [[v-sql v-params] (operand (get m k))]
+                       [(str (ident k) " = " v-sql) v-params]))
+                   (sorted-keys m))]
+    [(str "ON DUPLICATE KEY UPDATE " (str/join ", " (sqls-of parts)))
+     (params-of parts)]))
+
+;; ===========================================================================
 ;; Dispatch tables
 ;; ===========================================================================
 
 (def- select-emitters
-  {:with            emit-with
-   :with-recursive  emit-with-recursive
-   :select          emit-select
-   :select-distinct emit-select-distinct
-   :from            emit-from
-   :join            emit-join
-   :left-join       emit-left-join
-   :right-join      emit-right-join
-   :full-join       emit-full-join
-   :cross-join      emit-cross-join
-   :where           emit-where-clause
-   :group-by        emit-group-by
-   :having          emit-having-clause
-   :order-by        emit-order-by
-   :limit           emit-limit
-   :offset          emit-offset
-   :for             emit-for
-   :returning       emit-returning})
+  {:with               emit-with
+   :with-recursive     emit-with-recursive
+   :select             emit-select
+   :select-distinct    emit-select-distinct
+   :select-distinct-on emit-select-distinct-on
+   :from               emit-from
+   :join               emit-join
+   :left-join          emit-left-join
+   :right-join         emit-right-join
+   :full-join          emit-full-join
+   :cross-join         emit-cross-join
+   :where              emit-where-clause
+   :group-by           emit-group-by
+   :having             emit-having-clause
+   :order-by           emit-order-by
+   :limit              emit-limit
+   :offset             emit-offset
+   :for                emit-for
+   :returning          emit-returning})
 
 (def- select-order
   [:with :with-recursive
-   :select :select-distinct
+   :select :select-distinct :select-distinct-on
    :from :join :left-join :right-join :full-join :cross-join
    :where :group-by :having
    :order-by :limit :offset
@@ -396,13 +666,25 @@
 ;; Dispatch helpers
 ;; ===========================================================================
 
+(defn- mutex-select-mode! [query]
+  (let [modes [:select :select-distinct :select-distinct-on]
+        present (filter (fn [k] (contains? query k)) modes)]
+    (when (> (count present) 1)
+      (bad-arg (str "Only one of " (str/join " / " (map name modes))
+                    " may be present, got: " (str/join ", " (map name present)))))))
+
 (defn- statement-type [query]
   (cond
     (some (fn [k] (contains? query k)) set-op-keywords) :set-op
     (contains? query :insert-into) :insert
     (contains? query :update)      :update
     (contains? query :delete-from) :delete
-    :else                          :select))
+    (and (contains? query :values)
+         (not (contains? query :select))
+         (not (contains? query :select-distinct))
+         (not (contains? query :select-distinct-on))
+         (not (contains? query :from))) :values-only
+    :else :select))
 
 (defn- check-unknown! [query allowed]
   (let [unknown (->> (keys query)
@@ -417,14 +699,24 @@
         parts (map (fn [k] ((get emitters k) (get query k))) present)]
     [(str/join " " (sqls-of parts)) (vec (params-of parts))]))
 
-(defn- emit-select-stmt [q] (emit-ordered q select-emitters select-order))
+(defn- emit-select-stmt [q]
+  (mutex-select-mode! q)
+  (emit-ordered q select-emitters select-order))
+
 (defn- emit-update-stmt [q] (emit-ordered q update-emitters update-order))
 (defn- emit-delete-stmt [q] (emit-ordered q delete-emitters delete-order))
 
+(def- insert-allowed
+  #{:with :with-recursive :insert-into :columns :values :returning
+    :on-conflict :on-conflict-where :do-nothing :do-update-set :do-update-where
+    :on-duplicate-key-update})
+
 (defn- emit-insert-stmt [query]
-  (check-unknown! query #{:with :with-recursive :insert-into :columns :values :returning})
+  (check-unknown! query insert-allowed)
   (when-not (contains? query :insert-into) (bad-arg "insert statement requires :insert-into"))
   (when-not (contains? query :values)      (bad-arg "insert statement requires :values"))
+  (when (and (contains? query :on-conflict) (contains? query :on-duplicate-key-update))
+    (bad-arg ":on-conflict and :on-duplicate-key-update are mutually exclusive"))
   (let [vs (normalise-values (get query :values))
         columns-sql (cond
                       (contains? query :columns) (first (emit-columns (get query :columns)))
@@ -433,7 +725,12 @@
                (contains? query :with)           (conj (emit-with           (get query :with)))
                (contains? query :with-recursive) (conj (emit-with-recursive (get query :with-recursive))))
         body [(emit-insert-into (get query :insert-into))]
+        conflict (emit-on-conflict-block query)
+        odku (when (contains? query :on-duplicate-key-update)
+               (emit-on-duplicate-key-update (get query :on-duplicate-key-update)))
         tail (cond-> []
+               conflict (conj conflict)
+               odku     (conj odku)
                (contains? query :returning) (conj (emit-returning (get query :returning))))
         leading-fragments (concat head body)
         leading-sql (str/join " " (sqls-of leading-fragments))
@@ -447,6 +744,11 @@
                                    (get vs :values-sql)
                                    tail-sql]))]
     [all-sql (vec (concat leading-params (get vs :params) tail-params))]))
+
+(defn- emit-values-stmt [query]
+  (check-unknown! query #{:values})
+  (let [vs (normalise-values (get query :values))]
+    [(get vs :values-sql) (get vs :params)]))
 
 (defn- find-set-op [query]
   (first (filter (fn [k] (contains? query k)) set-op-keywords)))
@@ -469,11 +771,12 @@
   (when-not (map? query)
     (bad-arg (str "format expects a map, got: " (show query))))
   (case (statement-type query)
-    :set-op (emit-set-op-stmt query)
-    :insert (emit-insert-stmt query)
-    :update (emit-update-stmt query)
-    :delete (emit-delete-stmt query)
-    :select (emit-select-stmt query)))
+    :set-op      (emit-set-op-stmt query)
+    :insert      (emit-insert-stmt query)
+    :update      (emit-update-stmt query)
+    :delete      (emit-delete-stmt query)
+    :values-only (emit-values-stmt query)
+    :select      (emit-select-stmt query)))
 
 ;; ===========================================================================
 ;; Public API
@@ -482,12 +785,24 @@
 (defn format
   "Compile a data-driven SQL map into a `[sql params]` tuple. Pure: no I/O.
 
-  Statement kind auto-detected from clause keys:
-    SELECT  default
-    INSERT  if :insert-into is present
-    UPDATE  if :update is present
-    DELETE  if :delete-from is present
-    SET-OP  if :union / :union-all / :intersect / :except is present
+  Statement kinds (auto-detected from clause keys):
+    SELECT      default
+    INSERT      if :insert-into is present
+    UPDATE      if :update is present
+    DELETE      if :delete-from is present
+    SET-OP      if :union / :union-all / :intersect / :except is present
+    VALUES-ONLY if :values is present without any select/from/dml keys
+
+  Expression forms valid anywhere an identifier or operand is accepted:
+    [:raw \"SQL\"]                  raw fragment, no params
+    [:fn name & args]               function call (count(*), date_trunc, ...)
+    [:cast expr type]               CAST(expr AS TYPE)
+    [:case test then ... :else d]   CASE WHEN ... THEN ... ELSE ... END
+    [:over expr {:partition-by ... :order-by ... :frame [...]}]
+                                    window function
+    [:filter expr where]            agg FILTER (WHERE ...)
+    [:lateral subquery]             LATERAL subquery (joins / from)
+    map                             subquery (...)
 
   Throws InvalidArgumentException on unknown clauses or malformed data."
   {:example "(format {:select [:id :name] :from [:users] :where [:= :status \"active\"]})
