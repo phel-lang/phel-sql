@@ -9,39 +9,43 @@ composer require phel-lang/phel-sql
 ## Require it
 
 ```phel
-(ns my-app\queries
-  (:require phel-sql\sql :as sql))
+(ns my-app.queries
+  (:require phel-sql.sql :as sql))
 ```
 
 ## Three queries
 
-### 1. Simple select
-
-```phel
-(sql/format {:select [:id :name] :from [:users]})
-;; => ["SELECT id, name FROM users" []]
-```
-
-### 2. Filtered select
+### 1. Filtered select with a join
 
 ```phel
 (sql/format
-  {:select [:id]
-   :from   [:users]
-   :where  [:and [:= :status "active"] [:>= :age 18]]})
-;; => ["SELECT id FROM users WHERE (status = ?) AND (age >= ?)" ["active" 18]]
+  {:select [:u/id :u/name]
+   :from   [[:users :u]]
+   :join   [[:orders :o] [:= :u/id :o/user_id]]
+   :where  [:= :u/status "active"]})
+;; => ["SELECT u.id, u.name FROM users AS u JOIN orders AS o ON u.id = o.user_id WHERE u.status = ?"
+;;     ["active"]]
 ```
 
-### 3. Paginated select
+### 2. Insert returning the new row
 
 ```phel
 (sql/format
-  {:select   [:id :name]
-   :from     [:users]
-   :order-by [[:created_at :desc]]
-   :limit    20
-   :offset   40})
-;; => ["SELECT id, name FROM users ORDER BY created_at DESC LIMIT 20 OFFSET 40" []]
+  {:insert-into :users
+   :values     [{:name "alice" :email "a@x.com"}]
+   :returning  [:id]})
+;; => ["INSERT INTO users (email, name) VALUES (?, ?) RETURNING id" ["a@x.com" "alice"]]
+```
+
+### 3. Update with returning
+
+```phel
+(sql/format
+  {:update    :users
+   :set       {:status "banned"}
+   :where     [:= :id 42]
+   :returning [:id :status]})
+;; => ["UPDATE users SET status = ? WHERE id = ? RETURNING id, status" ["banned" 42]]
 ```
 
 ## Run it against a database
@@ -56,5 +60,5 @@ $stmt->execute($params);
 
 ## Next
 
-- [Clauses](clauses.md) for the full shape reference.
-- [Parameters](parameters.md) for how values and identifiers are distinguished.
+- [Clauses](clauses.md) for the full reference.
+- [Parameters](parameters.md) for how values, identifiers, and subqueries interact.
