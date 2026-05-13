@@ -1,0 +1,12 @@
+(in-ns phel-sql.sql)
+
+(defn- bad-arg [msg]
+  (throw (php/new \InvalidArgumentException msg)))
+
+(defn- show [x] (php/var_export x true))
+
+(defn- params-of [fragments] (mapcat (fn [[_ p]] p) fragments))
+(defn- sqls-of   [fragments] (map first fragments))
+
+(defn- prefixed [prefix [sql params]]
+  [(str prefix " " sql) params])

@@ -1,0 +1,158 @@
+(in-ns phel-sql.sql)
+
+;; ===========================================================================
+;; Function calls, CAST, CASE, OVER, FILTER, LATERAL
+;; ===========================================================================
+
+(defn- emit-fn-call [[_ fname & args]]
+  (when-not (or (keyword? fname) (string? fname))
+    (bad-arg (str "fn expects a keyword or string function name, got: " (show fname))))
+  (let [parts (map operand args)]
+    [(str (ident fname) "(" (str/join ", " (sqls-of parts)) ")")
+     (params-of parts)]))
+
+(defn- emit-cast [[_ x type-spec]]
+  (when (nil? type-spec)
+    (bad-arg "cast expects [:cast expr type]"))
+  (let [[s p] (operand x)
+        type-sql (cond
+                   (keyword? type-spec) (name type-spec)
+                   (string? type-spec)  type-spec
+                   :else (bad-arg (str "cast type must be a keyword or string, got: " (show type-spec))))]
+    [(str "CAST(" s " AS " type-sql ")") p]))
+
+(defn- split-case-args
+  "Walk case args, collecting [test then] pairs until we hit :else, then take
+   the final default. Returns [pairs default-or-nil]."
+  [args]
+  (loop [remaining args
+         pairs []
+         default nil]
+    (cond
+      (empty? remaining) [pairs default]
+
+      (= (first remaining) :else)
+      (do
+        (when (not= (count remaining) 2)
+          (bad-arg "case :else must be followed by exactly one default value at the end"))
+        [pairs (second remaining)])
+
+      (< (count remaining) 2)
+      (bad-arg "case expects pairs of [test then]")
+
+      :else
+      (recur (drop 2 remaining)
+             (conj pairs [(first remaining) (second remaining)])
+             default))))
+
+(defn- emit-case [[_ & args]]
+  (let [[pairs default] (split-case-args args)]
+    (when (zero? (count pairs))
+      (bad-arg "case requires at least one [test then] pair"))
+    (let [pair-fragments
+          (for [[test then] :in pairs]
+            (let [[t-sql t-p] (emit-where test)
+                  [v-sql v-p] (operand then)]
+              [(str "WHEN " t-sql " THEN " v-sql)
+               (concat t-p v-p)]))
+          else-fragment (when-not (nil? default)
+                          (let [[s p] (operand default)]
+                            [(str "ELSE " s) p]))
+          all (if else-fragment
+                (concat pair-fragments [else-fragment])
+                pair-fragments)]
+      [(str "CASE " (str/join " " (sqls-of all)) " END")
+       (params-of all)])))
+
+(def- frame-tokens
+  {:rows                "ROWS"
+   :range               "RANGE"
+   :groups              "GROUPS"
+   :between             "BETWEEN"
+   :and                 "AND"
+   :unbounded-preceding "UNBOUNDED PRECEDING"
+   :current-row         "CURRENT ROW"
+   :unbounded-following "UNBOUNDED FOLLOWING"
+   :exclude-no-others   "EXCLUDE NO OTHERS"
+   :exclude-current-row "EXCLUDE CURRENT ROW"
+   :exclude-group       "EXCLUDE GROUP"
+   :exclude-ties        "EXCLUDE TIES"})
+
+(defn- emit-frame-token [t]
+  (cond
+    (keyword? t) (or (get frame-tokens t)
+                     (bad-arg (str "Unknown frame token: " (show t))))
+    (and (vector? t) (= 2 (count t)) (int? (second t)))
+    (case (first t)
+      :preceding (str (second t) " PRECEDING")
+      :following (str (second t) " FOLLOWING")
+      (bad-arg (str "Unknown frame modifier: " (show (first t)))))
+    :else (bad-arg (str "Unsupported frame token: " (show t)))))
+
+(defn- emit-frame [tokens]
+  (when-not (and (vector? tokens) (seq tokens))
+    (bad-arg ":frame expects a non-empty vector of tokens"))
+  (str/join " " (map emit-frame-token tokens)))
+
+(defn- emit-window-spec [m]
+  (when-not (map? m)
+    (bad-arg (str "over expects a window-spec map, got: " (show m))))
+  (let [allowed #{:partition-by :order-by :frame}
+        unknown (filter (fn [k] (not (contains? allowed k))) (keys m))]
+    (when (seq unknown)
+      (bad-arg (str "Unknown window-spec key(s): " (str/join ", " (map name unknown))))))
+  (let [pieces (atom [])
+        params (atom [])
+        push! (fn [s p]
+                (swap! pieces conj s)
+                (reset! params (concat (deref params) p)))]
+    (when (contains? m :partition-by)
+      (let [cols (get m :partition-by)
+            parts (map ident+ cols)]
+        (push! (str "PARTITION BY " (str/join ", " (sqls-of parts)))
+               (params-of parts))))
+    (when (contains? m :order-by)
+      (let [[s p] (emit-order-fragments (get m :order-by))]
+        (push! (str "ORDER BY " s) p)))
+    (when (contains? m :frame)
+      (push! (emit-frame (get m :frame)) []))
+    [(str/join " " (deref pieces)) (vec (deref params))]))
+
+(defn- emit-over [[_ x window-spec]]
+  (let [[e-sql e-params] (operand x)
+        [w-sql w-params] (emit-window-spec window-spec)]
+    [(str e-sql " OVER (" w-sql ")") (concat e-params w-params)]))
+
+(defn- emit-filter-expr [[_ x where]]
+  (let [[e-sql e-params] (operand x)
+        [w-sql w-params] (emit-where where)]
+    [(str e-sql " FILTER (WHERE " w-sql ")") (concat e-params w-params)]))
+
+(defn- emit-lateral [[_ q]]
+  (when-not (subquery? q)
+    (bad-arg "lateral expects a subquery map"))
+  (let [[s p] (compile-query q)]
+    [(str "LATERAL (" s ")") p]))
+
+(defn- emit-tagged [x]
+  (case (first x)
+    :raw     [(second x) []]
+    :fn      (emit-fn-call x)
+    :cast    (emit-cast x)
+    :case    (emit-case x)
+    :over    (emit-over x)
+    :filter  (emit-filter-expr x)
+    :lateral (emit-lateral x)))
+
+(defn- operand
+  "Used in value positions (where RHS, set RHS, fn arg, etc):
+   keyword     -> identifier
+   tagged form -> dispatched
+   subquery    -> '(...)'
+   anything    -> '?' (bound)."
+  [x]
+  (cond
+    (keyword? x)  [(ident x) []]
+    (tagged? x)   (emit-tagged x)
+    (subquery? x) (let [[s p] (compile-query x)] [(str "(" s ")") p])
+    :else         ["?" [x]]))

@@ -1,0 +1,184 @@
+(in-ns phel-sql.sql)
+
+;; ===========================================================================
+;; Per-statement clause dispatch
+;; ===========================================================================
+
+(def- select-emitters
+  {:with               emit-with
+   :with-recursive     emit-with-recursive
+   :select             emit-select
+   :select-distinct    emit-select-distinct
+   :select-distinct-on emit-select-distinct-on
+   :from               emit-from
+   :join               emit-join
+   :left-join          emit-left-join
+   :right-join         emit-right-join
+   :full-join          emit-full-join
+   :cross-join         emit-cross-join
+   :where              emit-where-clause
+   :group-by           emit-group-by
+   :having             emit-having-clause
+   :order-by           emit-order-by
+   :limit              emit-limit
+   :offset             emit-offset
+   :for                emit-for
+   :returning          emit-returning})
+
+(def- select-order
+  [:with :with-recursive
+   :select :select-distinct :select-distinct-on
+   :from :join :left-join :right-join :full-join :cross-join
+   :where :group-by :having
+   :order-by :limit :offset
+   :for :returning])
+
+(def- update-emitters
+  {:with            emit-with
+   :with-recursive  emit-with-recursive
+   :update          emit-update
+   :set             emit-set
+   :from            emit-from
+   :where           emit-where-clause
+   :order-by        emit-order-by
+   :limit           emit-limit
+   :returning       emit-returning})
+
+(def- update-order
+  [:with :with-recursive :update :set :from :where :order-by :limit :returning])
+
+(def- delete-emitters
+  {:with            emit-with
+   :with-recursive  emit-with-recursive
+   :delete-from     emit-delete-from
+   :where           emit-where-clause
+   :order-by        emit-order-by
+   :limit           emit-limit
+   :returning       emit-returning})
+
+(def- delete-order
+  [:with :with-recursive :delete-from :where :order-by :limit :returning])
+
+(def- set-op-keywords #{:union :union-all :intersect :except})
+
+(def- set-op-sql
+  {:union      "UNION"
+   :union-all  "UNION ALL"
+   :intersect  "INTERSECT"
+   :except     "EXCEPT"})
+
+;; ===========================================================================
+;; Helpers
+;; ===========================================================================
+
+(defn- mutex-select-mode! [query]
+  (let [modes [:select :select-distinct :select-distinct-on]
+        present (filter (fn [k] (contains? query k)) modes)]
+    (when (> (count present) 1)
+      (bad-arg (str "Only one of " (str/join " / " (map name modes))
+                    " may be present, got: " (str/join ", " (map name present)))))))
+
+(defn- statement-type [query]
+  (cond
+    (some (fn [k] (contains? query k)) set-op-keywords) :set-op
+    (contains? query :insert-into) :insert
+    (contains? query :update)      :update
+    (contains? query :delete-from) :delete
+    (and (contains? query :values)
+         (not (contains? query :select))
+         (not (contains? query :select-distinct))
+         (not (contains? query :select-distinct-on))
+         (not (contains? query :from))) :values-only
+    :else :select))
+
+(defn- check-unknown! [query allowed]
+  (let [unknown (->> (keys query)
+                     (filter (fn [k] (not (contains? allowed k)))))]
+    (when (seq unknown)
+      (bad-arg (str "Unknown clause(s) for this statement: "
+                    (str/join ", " (map name unknown)))))))
+
+(defn- emit-ordered [query emitters clause-order]
+  (check-unknown! query (set clause-order))
+  (let [present (filter (fn [k] (contains? query k)) clause-order)
+        parts (map (fn [k] ((get emitters k) (get query k))) present)]
+    [(str/join " " (sqls-of parts)) (vec (params-of parts))]))
+
+(defn- emit-select-stmt [q]
+  (mutex-select-mode! q)
+  (emit-ordered q select-emitters select-order))
+
+(defn- emit-update-stmt [q] (emit-ordered q update-emitters update-order))
+(defn- emit-delete-stmt [q] (emit-ordered q delete-emitters delete-order))
+
+(def- insert-allowed
+  #{:with :with-recursive :insert-into :columns :values :returning
+    :on-conflict :on-conflict-where :do-nothing :do-update-set :do-update-where
+    :on-duplicate-key-update})
+
+(defn- emit-insert-stmt [query]
+  (check-unknown! query insert-allowed)
+  (when-not (contains? query :insert-into) (bad-arg "insert statement requires :insert-into"))
+  (when-not (contains? query :values)      (bad-arg "insert statement requires :values"))
+  (when (and (contains? query :on-conflict) (contains? query :on-duplicate-key-update))
+    (bad-arg ":on-conflict and :on-duplicate-key-update are mutually exclusive"))
+  (let [vs (normalise-values (get query :values))
+        columns-sql (cond
+                      (contains? query :columns) (first (emit-columns (get query :columns)))
+                      :else                      (get vs :columns-sql))
+        head (cond-> []
+               (contains? query :with)           (conj (emit-with           (get query :with)))
+               (contains? query :with-recursive) (conj (emit-with-recursive (get query :with-recursive))))
+        body [(emit-insert-into (get query :insert-into))]
+        conflict (emit-on-conflict-block query)
+        odku (when (contains? query :on-duplicate-key-update)
+               (emit-on-duplicate-key-update (get query :on-duplicate-key-update)))
+        tail (cond-> []
+               conflict (conj conflict)
+               odku     (conj odku)
+               (contains? query :returning) (conj (emit-returning (get query :returning))))
+        leading-fragments (concat head body)
+        leading-sql (str/join " " (sqls-of leading-fragments))
+        leading-params (vec (params-of leading-fragments))
+        tail-sql (str/join " " (sqls-of tail))
+        tail-params (vec (params-of tail))
+        all-sql (str/join " "
+                          (filter (fn [s] (not (empty? s)))
+                                  [leading-sql
+                                   columns-sql
+                                   (get vs :values-sql)
+                                   tail-sql]))]
+    [all-sql (vec (concat leading-params (get vs :params) tail-params))]))
+
+(defn- emit-values-stmt [query]
+  (check-unknown! query #{:values})
+  (let [vs (normalise-values (get query :values))]
+    [(get vs :values-sql) (get vs :params)]))
+
+(defn- find-set-op [query]
+  (first (filter (fn [k] (contains? query k)) set-op-keywords)))
+
+(defn- emit-set-op-stmt [query]
+  (let [op (find-set-op query)
+        extras (filter (fn [k] (not= k op)) (keys query))]
+    (when (seq extras)
+      (bad-arg (str "set-op query supports only one of "
+                    (str/join "/" (map name set-op-keywords))
+                    ", got extras: " (str/join ", " (map name extras)))))
+    (let [queries (get query op)]
+      (when-not (and (vector? queries) (>= (count queries) 2))
+        (bad-arg (str (name op) " expects a vector of at least two queries")))
+      (let [parts (map compile-query queries)
+            sqls (map (fn [[s _]] (str "(" s ")")) parts)]
+        [(str/join (str " " (get set-op-sql op) " ") sqls) (vec (params-of parts))]))))
+
+(defn- compile-query [query]
+  (when-not (map? query)
+    (bad-arg (str "format expects a map, got: " (show query))))
+  (case (statement-type query)
+    :set-op      (emit-set-op-stmt query)
+    :insert      (emit-insert-stmt query)
+    :update      (emit-update-stmt query)
+    :delete      (emit-delete-stmt query)
+    :values-only (emit-values-stmt query)
+    :select      (emit-select-stmt query)))

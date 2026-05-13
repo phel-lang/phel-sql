@@ -1,0 +1,39 @@
+(in-ns phel-sql.sql)
+
+(def- expr-tags #{:raw :fn :cast :case :over :filter :lateral})
+
+(defn- subquery? [x] (map? x))
+(defn- tagged? [x] (and (vector? x) (keyword? (first x)) (contains? expr-tags (first x))))
+(defn- raw? [x] (and (vector? x) (= :raw (first x)) (= 2 (count x))))
+
+(defn- ident
+  "Render a plain identifier (no params, no subquery).
+    keyword         -> bare name (qualified -> 'schema.name')
+    string          -> literal escape hatch"
+  [x]
+  (cond
+    (keyword? x) (if-let [ns (namespace x)]
+                   (str ns "." (name x))
+                   (name x))
+    (string? x)  x
+    :else (bad-arg (str "Unsupported identifier: " (show x)))))
+
+(defn- ident+
+  "Identifier with optional params. Accepts everything `ident` does, plus
+    [:raw ...] / [:fn ...] / [:cast ...] / [:case ...] / [:over ...] /
+    [:filter ...] / [:lateral ...]  -> tagged expression
+    [base alias]    -> 'base AS alias'  (base may be any of the above or a subquery)
+    subquery map    -> '(...)'"
+  [x]
+  (cond
+    (tagged? x)   (emit-tagged x)
+    (subquery? x) (let [[s p] (compile-query x)] [(str "(" s ")") p])
+    (vector? x)
+    (let [[base alias] x
+          [b-sql b-params] (ident+ base)]
+      [(str b-sql " AS " (ident alias)) b-params])
+    :else [(ident x) []]))
+
+(defn- idents+ [xs]
+  (let [parts (map ident+ xs)]
+    [(str/join ", " (sqls-of parts)) (params-of parts)]))

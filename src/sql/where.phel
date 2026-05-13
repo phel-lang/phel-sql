@@ -1,0 +1,89 @@
+(in-ns phel-sql.sql)
+
+(def- binary-ops
+  {:=        "="
+   :!=       "!="
+   :<        "<"
+   :>        ">"
+   :<=       "<="
+   :>=       ">="
+   :like     "LIKE"
+   :not-like "NOT LIKE"
+   :ilike    "ILIKE"
+   :not-ilike "NOT ILIKE"})
+
+(defn- emit-binary [op-sql args]
+  (let [[lhs rhs] args
+        [l-sql l-params] (operand lhs)
+        [r-sql r-params] (operand rhs)]
+    [(str l-sql " " op-sql " " r-sql)
+     (concat l-params r-params)]))
+
+(defn- emit-logical [joiner clauses]
+  (when (empty? clauses)
+    (bad-arg (str joiner " expects at least one clause")))
+  (let [parts (map emit-where clauses)
+        sqls (map (fn [[s _]] (str "(" s ")")) parts)]
+    [(str/join (str " " joiner " ") sqls) (params-of parts)]))
+
+(defn- emit-in [args negate?]
+  (let [[col vs] args
+        kw (if negate? "NOT IN" "IN")
+        [c-sql c-params] (operand col)]
+    (cond
+      (subquery? vs)
+      (let [[s p] (compile-query vs)]
+        [(str c-sql " " kw " (" s ")") (concat c-params p)])
+
+      (and (vector? vs) (seq vs))
+      (let [parts (map operand vs)]
+        [(str c-sql " " kw " (" (str/join ", " (sqls-of parts)) ")")
+         (concat c-params (params-of parts))])
+
+      :else
+      (bad-arg "in/not-in expects a non-empty vector of values or a subquery map"))))
+
+(defn- emit-between [args negate?]
+  (let [[col lo hi] args
+        kw (if negate? "NOT BETWEEN" "BETWEEN")
+        [c-sql c-params] (operand col)
+        [lo-sql lo-params] (operand lo)
+        [hi-sql hi-params] (operand hi)]
+    [(str c-sql " " kw " " lo-sql " AND " hi-sql)
+     (concat c-params lo-params hi-params)]))
+
+(defn- emit-null [col negate?]
+  (let [[s p] (operand col)]
+    [(str s (if negate? " IS NOT NULL" " IS NULL")) p]))
+
+(defn- emit-not [args]
+  (let [[s p] (emit-where (first args))]
+    [(str "NOT (" s ")") p]))
+
+(defn- emit-exists [args negate?]
+  (let [q (first args)]
+    (when-not (subquery? q)
+      (bad-arg "exists/not-exists expects a subquery map"))
+    (let [[s p] (compile-query q)
+          kw (if negate? "NOT EXISTS" "EXISTS")]
+      [(str kw " (" s ")") p])))
+
+(defn- emit-where [clause]
+  (when-not (vector? clause)
+    (bad-arg (str "where clause must be a vector, got: " (show clause))))
+  (let [[op & args] clause]
+    (case op
+      :and          (emit-logical "AND" args)
+      :or           (emit-logical "OR" args)
+      :not          (emit-not args)
+      :in           (emit-in args false)
+      :not-in       (emit-in args true)
+      :between      (emit-between args false)
+      :not-between  (emit-between args true)
+      :is-null      (emit-null (first args) false)
+      :is-not-null  (emit-null (first args) true)
+      :exists       (emit-exists args false)
+      :not-exists   (emit-exists args true)
+      (if (contains? binary-ops op)
+        (emit-binary (get binary-ops op) args)
+        (bad-arg (str "Unknown where operator: " (show op)))))))

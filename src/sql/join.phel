@@ -1,0 +1,37 @@
+(in-ns phel-sql.sql)
+
+(defn- emit-join-on [on]
+  (cond
+    (and (vector? on) (= (first on) :using))
+    (let [cols (rest on)]
+      (when (empty? cols)
+        (bad-arg "join :using expects at least one column"))
+      [(str "USING (" (str/join ", " (map ident cols)) ")") []])
+    (tagged? on)
+    (prefixed "ON" (emit-tagged on))
+    :else
+    (prefixed "ON" (emit-where on))))
+
+(defn- emit-join-list [kw pairs]
+  (when-not (and (vector? pairs) (pos? (count pairs)) (even? (count pairs)))
+    (bad-arg (str kw " expects a vector of [table on-clause] pairs")))
+  (let [compiled (->> pairs
+                      (partition 2)
+                      (map (fn [[table on]]
+                             (let [[t-sql t-params] (ident+ table)
+                                   [o-sql o-params] (emit-join-on on)]
+                               [(str kw " " t-sql " " o-sql)
+                                (concat t-params o-params)]))))]
+    [(str/join " " (sqls-of compiled)) (params-of compiled)]))
+
+(defn- emit-cross-join [tables]
+  (when-not (and (vector? tables) (seq tables))
+    (bad-arg "cross-join expects a non-empty vector of tables"))
+  (let [parts (map ident+ tables)
+        sqls (map (fn [[s _]] (str "CROSS JOIN " s)) parts)]
+    [(str/join " " sqls) (params-of parts)]))
+
+(defn- emit-join       [pairs] (emit-join-list "JOIN"       pairs))
+(defn- emit-left-join  [pairs] (emit-join-list "LEFT JOIN"  pairs))
+(defn- emit-right-join [pairs] (emit-join-list "RIGHT JOIN" pairs))
+(defn- emit-full-join  [pairs] (emit-join-list "FULL JOIN"  pairs))

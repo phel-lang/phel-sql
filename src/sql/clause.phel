@@ -1,0 +1,63 @@
+(in-ns phel-sql.sql)
+
+;; ===========================================================================
+;; Simple SELECT-side clauses
+;; ===========================================================================
+
+(defn- emit-select          [cols]  (prefixed "SELECT" (idents+ cols)))
+(defn- emit-select-distinct [cols]  (prefixed "SELECT DISTINCT" (idents+ cols)))
+(defn- emit-from            [xs]    (prefixed "FROM"   (idents+ xs)))
+(defn- emit-group-by        [cols]  (prefixed "GROUP BY" (idents+ cols)))
+(defn- emit-returning       [cols]  (prefixed "RETURNING" (idents+ cols)))
+(defn- emit-where-clause    [w]     (prefixed "WHERE"  (emit-where w)))
+(defn- emit-having-clause   [w]     (prefixed "HAVING" (emit-where w)))
+
+(defn- emit-select-distinct-on [spec]
+  (when-not (map? spec)
+    (bad-arg ":select-distinct-on expects {:on [...] :select [...]}"))
+  (let [on-cols  (get spec :on)
+        sel-cols (get spec :select)
+        allowed  #{:on :select}
+        unknown  (filter (fn [k] (not (contains? allowed k))) (keys spec))]
+    (when (seq unknown)
+      (bad-arg (str "Unknown :select-distinct-on key(s): " (str/join ", " (map name unknown)))))
+    (when-not (and (vector? on-cols) (seq on-cols))
+      (bad-arg ":select-distinct-on requires a non-empty :on vector"))
+    (when-not (and (vector? sel-cols) (seq sel-cols))
+      (bad-arg ":select-distinct-on requires a non-empty :select vector"))
+    (let [[on-sql on-params] (idents+ on-cols)
+          [sel-sql sel-params] (idents+ sel-cols)]
+      [(str "SELECT DISTINCT ON (" on-sql ") " sel-sql)
+       (concat on-params sel-params)])))
+
+;; ===========================================================================
+;; LIMIT / OFFSET / FOR
+;; ===========================================================================
+
+(defn- non-neg-int! [n clause]
+  (when-not (and (int? n) (>= n 0))
+    (bad-arg (str clause " must be a non-negative integer, got: " (show n)))))
+
+(defn- emit-limit  [n] (non-neg-int! n "limit")  [(str "LIMIT " n)  []])
+(defn- emit-offset [n] (non-neg-int! n "offset") [(str "OFFSET " n) []])
+
+(def- for-modes
+  {:update        "UPDATE"
+   :share         "SHARE"
+   :no-key-update "NO KEY UPDATE"
+   :key-share     "KEY SHARE"})
+
+(def- for-locks
+  {:nowait      "NOWAIT"
+   :skip-locked "SKIP LOCKED"})
+
+(defn- emit-for [spec]
+  (let [[mode lock] (if (vector? spec) spec [spec nil])
+        mode-sql (or (get for-modes mode)
+                     (bad-arg (str "for mode must be one of "
+                                   (str/join ", " (map name (keys for-modes)))
+                                   ", got: " (show mode))))
+        lock-sql (when lock
+                   (or (get for-locks lock)
+                       (bad-arg (str "for lock must be :nowait or :skip-locked, got: " (show lock)))))]
+    [(if lock-sql (str "FOR " mode-sql " " lock-sql) (str "FOR " mode-sql)) []]))

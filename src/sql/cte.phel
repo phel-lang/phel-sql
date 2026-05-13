@@ -1,0 +1,16 @@
+(in-ns phel-sql.sql)
+
+(defn- emit-with-list [kw bindings]
+  (when-not (and (vector? bindings) (seq bindings))
+    (bad-arg (str kw " expects a non-empty vector of [name query] pairs")))
+  (let [compiled (map (fn [binding]
+                        (when-not (and (vector? binding) (= 2 (count binding)))
+                          (bad-arg (str kw " binding must be [name query], got: " (show binding))))
+                        (let [[bname q] binding
+                              [s p] (compile-query q)]
+                          [(str (ident bname) " AS (" s ")") p]))
+                      bindings)]
+    [(str kw " " (str/join ", " (sqls-of compiled))) (params-of compiled)]))
+
+(defn- emit-with           [b] (emit-with-list "WITH" b))
+(defn- emit-with-recursive [b] (emit-with-list "WITH RECURSIVE" b))

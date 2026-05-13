@@ -1,0 +1,50 @@
+(in-ns phel-sql.sql)
+
+(defn- emit-update      [t] (prefixed "UPDATE"      (ident+ t)))
+(defn- emit-delete-from [t] (prefixed "DELETE FROM" (ident+ t)))
+(defn- emit-insert-into [t] (prefixed "INSERT INTO" (ident+ t)))
+
+(defn- sorted-keys [m]
+  (sort (fn [a b] (php/strcmp (name a) (name b))) (keys m)))
+
+(defn- emit-set [m]
+  (when-not (map? m) (bad-arg (str "set expects a map, got: " (show m))))
+  (when (zero? (count m)) (bad-arg "set expects at least one assignment"))
+  (let [parts (map (fn [k]
+                     (let [[v-sql v-params] (operand (get m k))]
+                       [(str (ident k) " = " v-sql) v-params]))
+                   (sorted-keys m))]
+    [(str "SET " (str/join ", " (sqls-of parts))) (params-of parts)]))
+
+(defn- emit-columns [cols]
+  [(str "(" (str/join ", " (map ident cols)) ")") []])
+
+(defn- row-placeholders [row]
+  (str "(" (str/join ", " (map (fn [_] "?") row)) ")"))
+
+(defn- normalise-values
+  "Returns {:columns-sql ... :values-sql ... :params [...]}.
+   For map rows, columns are the union of keys (alphabetical for stability)
+   and columns-sql is included. For vector rows, columns-sql is nil."
+  [vs]
+  (when-not (and (vector? vs) (seq vs))
+    (bad-arg "values expects a non-empty vector"))
+  (cond
+    (every? map? vs)
+    (let [cols (->> vs
+                    (mapcat keys)
+                    distinct
+                    (sort (fn [a b] (php/strcmp (name a) (name b))))
+                    vec)
+          rows (map (fn [r] (vec (map (fn [k] (get r k)) cols))) vs)]
+      {:columns-sql (str "(" (str/join ", " (map ident cols)) ")")
+       :values-sql  (str "VALUES " (str/join ", " (map row-placeholders rows)))
+       :params      (vec (mapcat identity rows))})
+
+    (every? vector? vs)
+    {:columns-sql nil
+     :values-sql  (str "VALUES " (str/join ", " (map row-placeholders vs)))
+     :params      (vec (mapcat identity vs))}
+
+    :else
+    (bad-arg "values items must all be vectors or all be maps")))
