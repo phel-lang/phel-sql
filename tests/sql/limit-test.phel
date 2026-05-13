@@ -1,0 +1,31 @@
+(ns phel-sql-tests.sql.limit-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-limit
+  (is (= ["SELECT id FROM t LIMIT 10" []]
+         (sql/format {:select [:id] :from [:t] :limit 10}))))
+
+(deftest test-offset
+  (is (= ["SELECT id FROM t OFFSET 20" []]
+         (sql/format {:select [:id] :from [:t] :offset 20}))))
+
+(deftest test-limit-and-offset
+  (is (= ["SELECT id FROM t LIMIT 10 OFFSET 20" []]
+         (sql/format {:select [:id] :from [:t] :limit 10 :offset 20}))))
+
+(deftest test-limit-zero
+  (is (= ["SELECT id FROM t LIMIT 0" []]
+         (sql/format {:select [:id] :from [:t] :limit 0}))))
+
+(deftest test-rejects-negative-limit
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :limit -1}))))
+
+(deftest test-rejects-non-int-limit
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :limit "10"}))))
+
+(deftest test-rejects-negative-offset
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :offset -1}))))

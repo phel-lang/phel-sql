@@ -1,0 +1,33 @@
+(ns phel-sql-tests.sql.cte-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-with-single-cte
+  (is (= ["WITH active AS (SELECT id FROM users WHERE active = ?) SELECT id FROM active" [true]]
+         (sql/format {:with [[:active {:select [:id] :from [:users]
+                                       :where [:= :active true]}]]
+                      :select [:id]
+                      :from [:active]}))))
+
+(deftest test-with-multiple-ctes
+  (is (= ["WITH a AS (SELECT id FROM t1), b AS (SELECT id FROM t2) SELECT id FROM a JOIN b ON a.id = b.id"
+          []]
+         (sql/format {:with [[:a {:select [:id] :from [:t1]}]
+                             [:b {:select [:id] :from [:t2]}]]
+                      :select [:id]
+                      :from [:a]
+                      :join [:b [:= :a/id :b/id]]}))))
+
+(deftest test-with-recursive
+  (is (= ["WITH RECURSIVE chain AS (SELECT id FROM t) SELECT id FROM chain" []]
+         (sql/format {:with-recursive [[:chain {:select [:id] :from [:t]}]]
+                      :select [:id]
+                      :from [:chain]}))))
+
+(deftest test-with-rejects-empty
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:with [] :select [:id] :from [:t]}))))
+
+(deftest test-with-rejects-bad-binding
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:with [[:only-one-element]] :select [:id] :from [:t]}))))

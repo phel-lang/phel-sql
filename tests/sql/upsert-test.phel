@@ -1,0 +1,95 @@
+(ns phel-sql-tests.sql.upsert-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+;; ---- ON CONFLICT (Postgres) ----
+
+(deftest test-on-conflict-do-nothing
+  (is (= ["INSERT INTO users (email) VALUES (?) ON CONFLICT (email) DO NOTHING" ["a@x"]]
+         (sql/format {:insert-into :users
+                      :values [{:email "a@x"}]
+                      :on-conflict [:email]
+                      :do-nothing true}))))
+
+(deftest test-on-conflict-do-update-set
+  (is (= [(str "INSERT INTO users (email, name) VALUES (?, ?) "
+               "ON CONFLICT (email) DO UPDATE SET name = ?")
+          ["a@x" "alice" "alice"]]
+         (sql/format {:insert-into :users
+                      :values [{:email "a@x" :name "alice"}]
+                      :on-conflict [:email]
+                      :do-update-set {:name "alice"}}))))
+
+(deftest test-on-conflict-on-constraint
+  (is (= ["INSERT INTO t VALUES (?) ON CONFLICT ON CONSTRAINT t_pk DO NOTHING" [1]]
+         (sql/format {:insert-into :t :values [[1]]
+                      :on-conflict {:on-constraint :t_pk}
+                      :do-nothing true}))))
+
+(deftest test-on-conflict-no-target
+  (is (= ["INSERT INTO t VALUES (?) ON CONFLICT DO NOTHING" [1]]
+         (sql/format {:insert-into :t :values [[1]]
+                      :on-conflict []
+                      :do-nothing true}))))
+
+(deftest test-on-conflict-with-partial-index-where
+  (is (= [(str "INSERT INTO t (a, b) VALUES (?, ?) "
+               "ON CONFLICT (a) WHERE active = ? DO NOTHING")
+          [1 2 true]]
+         (sql/format {:insert-into :t :values [{:a 1 :b 2}]
+                      :on-conflict [:a]
+                      :on-conflict-where [:= :active true]
+                      :do-nothing true}))))
+
+(deftest test-on-conflict-do-update-where
+  (is (= [(str "INSERT INTO t (id) VALUES (?) "
+               "ON CONFLICT (id) DO UPDATE SET id = ? WHERE active = ?")
+          [1 1 true]]
+         (sql/format {:insert-into :t :values [{:id 1}]
+                      :on-conflict [:id]
+                      :do-update-set {:id 1}
+                      :do-update-where [:= :active true]}))))
+
+(deftest test-on-conflict-rejects-do-nothing-and-update
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t :values [[1]]
+                            :on-conflict [:id] :do-nothing true
+                            :do-update-set {:id 1}}))))
+
+(deftest test-on-conflict-rejects-missing-action
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t :values [[1]] :on-conflict [:id]}))))
+
+(deftest test-on-conflict-rejects-bad-target
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t :values [[1]]
+                            :on-conflict "id" :do-nothing true}))))
+
+;; ---- ON DUPLICATE KEY UPDATE (MySQL) ----
+
+(deftest test-on-duplicate-key-update
+  (is (= [(str "INSERT INTO users (email, name) VALUES (?, ?) "
+               "ON DUPLICATE KEY UPDATE name = ?")
+          ["a@x" "alice" "alice"]]
+         (sql/format {:insert-into :users
+                      :values [{:email "a@x" :name "alice"}]
+                      :on-duplicate-key-update {:name "alice"}}))))
+
+(deftest test-on-duplicate-key-update-with-raw
+  (is (= [(str "INSERT INTO users (email, name) VALUES (?, ?) "
+               "ON DUPLICATE KEY UPDATE name = VALUES(name)")
+          ["a@x" "alice"]]
+         (sql/format {:insert-into :users
+                      :values [{:email "a@x" :name "alice"}]
+                      :on-duplicate-key-update {:name [:raw "VALUES(name)"]}}))))
+
+(deftest test-on-duplicate-key-update-rejects-empty
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t :values [[1]]
+                            :on-duplicate-key-update {}}))))
+
+(deftest test-conflict-and-odku-mutex
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t :values [[1]]
+                            :on-conflict [:id] :do-nothing true
+                            :on-duplicate-key-update {:x 1}}))))

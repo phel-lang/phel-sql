@@ -1,0 +1,49 @@
+(ns phel-sql-tests.sql.subquery-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-subquery-in-where-binary
+  (is (= ["SELECT id FROM t WHERE id = (SELECT MAX(id) FROM t)" []]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:= :id {:select ["MAX(id)"] :from [:t]}]}))))
+
+(deftest test-subquery-in-in
+  (is (= ["SELECT id FROM t WHERE id IN (SELECT user_id FROM banned)" []]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:in :id {:select [:user_id] :from [:banned]}]}))))
+
+(deftest test-subquery-in-from-with-alias
+  (is (= ["SELECT u.id FROM (SELECT id FROM users WHERE active = ?) AS u" [true]]
+         (sql/format {:select [:u/id]
+                      :from [[{:select [:id] :from [:users]
+                               :where [:= :active true]} :u]]}))))
+
+(deftest test-subquery-in-select-with-alias
+  (is (= ["SELECT id, (SELECT COUNT(*) FROM logs WHERE logs.user_id = users.id) AS log_count FROM users"
+          []]
+         (sql/format {:select [:id [{:select ["COUNT(*)"]
+                                     :from [:logs]
+                                     :where [:= :logs/user_id :users/id]} :log_count]]
+                      :from [:users]}))))
+
+(deftest test-lateral-in-from
+  (is (= ["SELECT u.id FROM users AS u, LATERAL (SELECT max(id) FROM orders WHERE user_id = u.id) AS o"
+          []]
+         (sql/format {:select [:u/id]
+                      :from [[:users :u]
+                             [[:lateral {:select [[:fn :max :id]]
+                                         :from [:orders]
+                                         :where [:= :user_id :u/id]}]
+                              :o]]}))))
+
+(deftest test-lateral-in-join
+  (is (= ["SELECT u.id FROM users AS u JOIN LATERAL (SELECT max(id) FROM orders) AS o ON TRUE"
+          []]
+         (sql/format {:select [:u/id]
+                      :from [[:users :u]]
+                      :join [[[:lateral {:select [[:fn :max :id]] :from [:orders]}] :o]
+                             [:raw "TRUE"]]}))))
+
+(deftest test-lateral-rejects-non-subquery
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [[[:lateral :nope] :x]]}))))

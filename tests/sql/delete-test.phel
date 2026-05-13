@@ -1,0 +1,14 @@
+(ns phel-sql-tests.sql.delete-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-delete-basic
+  (is (= ["DELETE FROM users" []] (sql/format {:delete-from :users}))))
+
+(deftest test-delete-with-where
+  (is (= ["DELETE FROM users WHERE id = ?" [42]]
+         (sql/format {:delete-from :users :where [:= :id 42]}))))
+
+(deftest test-delete-with-returning
+  (is (= ["DELETE FROM users WHERE id = ? RETURNING id" [42]]
+         (sql/format {:delete-from :users :where [:= :id 42] :returning [:id]}))))

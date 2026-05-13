@@ -1,0 +1,21 @@
+(ns phel-sql-tests.sql.error-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-rejects-non-map-input
+  (is (thrown? \InvalidArgumentException (sql/format [:select [:id]]))))
+
+(deftest test-rejects-unknown-clause
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :wat [:dept]}))))
+
+(deftest test-rejects-unsupported-identifier
+  (is (thrown? \InvalidArgumentException (sql/format {:select [42]}))))
+
+(deftest test-rejects-select-clauses-in-update
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:update :t :set {:a 1} :group-by [:b]}))))
+
+(deftest test-rejects-select-clauses-in-delete
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:delete-from :t :group-by [:b]}))))

@@ -1,0 +1,39 @@
+(ns phel-sql-tests.sql.insert-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-insert-vector-rows
+  (is (= ["INSERT INTO users VALUES (?, ?), (?, ?)" ["a" 1 "b" 2]]
+         (sql/format {:insert-into :users :values [["a" 1] ["b" 2]]}))))
+
+(deftest test-insert-vector-rows-with-columns
+  (is (= ["INSERT INTO users (name, age) VALUES (?, ?), (?, ?)" ["a" 1 "b" 2]]
+         (sql/format {:insert-into :users :columns [:name :age]
+                      :values [["a" 1] ["b" 2]]}))))
+
+(deftest test-insert-map-rows
+  (is (= ["INSERT INTO users (age, name) VALUES (?, ?), (?, ?)" [1 "a" 2 "b"]]
+         (sql/format {:insert-into :users
+                      :values [{:name "a" :age 1} {:name "b" :age 2}]}))))
+
+(deftest test-insert-map-rows-union-of-keys
+  (is (= ["INSERT INTO users (age, email, name) VALUES (?, ?, ?), (?, ?, ?)"
+          [1 nil "a" nil "b@x" "b"]]
+         (sql/format {:insert-into :users
+                      :values [{:name "a" :age 1} {:name "b" :email "b@x"}]}))))
+
+(deftest test-insert-with-returning
+  (is (= ["INSERT INTO users (name) VALUES (?) RETURNING id" ["a"]]
+         (sql/format {:insert-into :users :values [{:name "a"}] :returning [:id]}))))
+
+(deftest test-insert-with-cte
+  (is (= ["WITH defaults AS (SELECT 1) INSERT INTO users VALUES (?)" ["a"]]
+         (sql/format {:with [[:defaults {:select ["1"]}]]
+                      :insert-into :users :values [["a"]]}))))
+
+(deftest test-insert-rejects-missing-values
+  (is (thrown? \InvalidArgumentException (sql/format {:insert-into :users}))))
+
+(deftest test-insert-rejects-mixed-rows
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :users :values [{:name "a"} ["b"]]}))))

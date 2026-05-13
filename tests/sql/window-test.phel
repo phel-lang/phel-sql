@@ -1,0 +1,58 @@
+(ns phel-sql-tests.sql.window-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-over-empty
+  (is (= ["SELECT row_number() OVER () FROM t" []]
+         (sql/format {:select [[:over [:fn :row_number] {}]] :from [:t]}))))
+
+(deftest test-over-partition-by
+  (is (= ["SELECT row_number() OVER (PARTITION BY dept) FROM emp" []]
+         (sql/format {:select [[:over [:fn :row_number] {:partition-by [:dept]}]]
+                      :from [:emp]}))))
+
+(deftest test-over-order-by
+  (is (= ["SELECT rank() OVER (ORDER BY salary DESC) FROM emp" []]
+         (sql/format {:select [[:over [:fn :rank] {:order-by [[:salary :desc]]}]]
+                      :from [:emp]}))))
+
+(deftest test-over-partition-and-order
+  (is (= ["SELECT row_number() OVER (PARTITION BY dept ORDER BY salary DESC) AS rn FROM emp" []]
+         (sql/format {:select [[[:over [:fn :row_number]
+                                 {:partition-by [:dept]
+                                  :order-by [[:salary :desc]]}]
+                                :rn]]
+                      :from [:emp]}))))
+
+(deftest test-over-frame-rows-unbounded-preceding
+  (is (= ["SELECT sum(amount) OVER (ORDER BY day ROWS UNBOUNDED PRECEDING) FROM t" []]
+         (sql/format {:select [[:over [:fn :sum :amount]
+                                {:order-by [:day]
+                                 :frame [:rows :unbounded-preceding]}]]
+                      :from [:t]}))))
+
+(deftest test-over-frame-rows-between
+  (is (= ["SELECT avg(x) OVER (ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) FROM t" []]
+         (sql/format {:select [[:over [:fn :avg :x]
+                                {:frame [:rows :between [:preceding 1] :and [:following 1]]}]]
+                      :from [:t]}))))
+
+(deftest test-over-frame-range-current-row
+  (is (= ["SELECT sum(x) OVER (ORDER BY t ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) FROM s"
+          []]
+         (sql/format {:select [[:over [:fn :sum :x]
+                                {:order-by [:t]
+                                 :frame [:rows :between :unbounded-preceding :and :current-row]}]]
+                      :from [:s]}))))
+
+(deftest test-over-rejects-unknown-key
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:over [:fn :row_number] {:partition :dept}]]}))))
+
+(deftest test-over-rejects-bad-frame-token
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:over [:fn :row_number] {:frame [:wat]}]]}))))
+
+(deftest test-over-rejects-non-map-spec
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:over [:fn :row_number] [:partition :dept]]]}))))

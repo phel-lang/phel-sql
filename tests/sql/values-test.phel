@@ -1,0 +1,11 @@
+(ns phel-sql-tests.sql.values-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-top-level-values-vector-rows
+  (is (= ["VALUES (?, ?), (?, ?)" [1 "a" 2 "b"]]
+         (sql/format {:values [[1 "a"] [2 "b"]]}))))
+
+(deftest test-top-level-values-rejects-extra-keys
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:values [[1]] :limit 5}))))

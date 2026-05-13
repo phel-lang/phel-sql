@@ -1,0 +1,27 @@
+(ns phel-sql-tests.sql.for-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-for-update
+  (is (= ["SELECT id FROM t FOR UPDATE" []]
+         (sql/format {:select [:id] :from [:t] :for :update}))))
+
+(deftest test-for-share
+  (is (= ["SELECT id FROM t FOR SHARE" []]
+         (sql/format {:select [:id] :from [:t] :for :share}))))
+
+(deftest test-for-update-nowait
+  (is (= ["SELECT id FROM t FOR UPDATE NOWAIT" []]
+         (sql/format {:select [:id] :from [:t] :for [:update :nowait]}))))
+
+(deftest test-for-update-skip-locked
+  (is (= ["SELECT id FROM t FOR UPDATE SKIP LOCKED" []]
+         (sql/format {:select [:id] :from [:t] :for [:update :skip-locked]}))))
+
+(deftest test-for-rejects-bad-mode
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :for :wat}))))
+
+(deftest test-for-rejects-bad-lock
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :for [:update :wat]}))))

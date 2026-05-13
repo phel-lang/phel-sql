@@ -1,0 +1,65 @@
+(ns phel-sql-tests.sql.integration-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-full-query
+  (is (= ["SELECT id, name FROM users WHERE (status = ?) AND (age >= ?) ORDER BY name ASC LIMIT 10 OFFSET 20"
+          ["active" 18]]
+         (sql/format {:select   [:id :name]
+                      :from     [:users]
+                      :where    [:and [:= :status "active"] [:>= :age 18]]
+                      :order-by [[:name :asc]]
+                      :limit    10
+                      :offset   20}))))
+
+(deftest test-everything-together
+  (is (= [(str "WITH active AS (SELECT id FROM users WHERE active = ?) "
+               "SELECT DISTINCT u.id, u.name "
+               "FROM users AS u "
+               "JOIN active AS a ON u.id = a.id "
+               "LEFT JOIN orders AS o ON u.id = o.user_id "
+               "WHERE (u.status = ?) AND (u.age >= ?) "
+               "GROUP BY u.id "
+               "HAVING COUNT(o.id) > ? "
+               "ORDER BY u.name ASC "
+               "LIMIT 10 OFFSET 20 "
+               "FOR UPDATE SKIP LOCKED")
+          [true "active" 18 5]]
+         (sql/format
+           {:with [[:active {:select [:id] :from [:users]
+                             :where [:= :active true]}]]
+            :select-distinct [:u/id :u/name]
+            :from     [[:users :u]]
+            :join     [[:active :a] [:= :u/id :a/id]]
+            :left-join [[:orders :o] [:= :u/id :o/user_id]]
+            :where    [:and [:= :u/status "active"] [:>= :u/age 18]]
+            :group-by [:u/id]
+            :having   [:> [:raw "COUNT(o.id)"] 5]
+            :order-by [[:u/name :asc]]
+            :limit    10
+            :offset   20
+            :for      [:update :skip-locked]}))))
+
+(deftest test-everything-with-window-and-case
+  (is (= [(str "WITH active AS (SELECT id FROM users WHERE deleted_at IS NULL) "
+               "SELECT u.id, "
+               "row_number() OVER (PARTITION BY u.dept ORDER BY u.salary DESC) AS rk, "
+               "CASE WHEN u.salary > ? THEN ? ELSE ? END AS tier "
+               "FROM users AS u "
+               "JOIN active AS a USING (id) "
+               "WHERE u.status = ? "
+               "ORDER BY u.dept ASC NULLS LAST")
+          [100000 "high" "low" "active"]]
+         (sql/format
+           {:with [[:active {:select [:id] :from [:users]
+                             :where [:is-null :deleted_at]}]]
+            :select [:u/id
+                     [[:over [:fn :row_number]
+                       {:partition-by [:u/dept]
+                        :order-by [[:u/salary :desc]]}]
+                      :rk]
+                     [[:case [:> :u/salary 100000] "high" :else "low"] :tier]]
+            :from [[:users :u]]
+            :join [[:active :a] [:using :id]]
+            :where [:= :u/status "active"]
+            :order-by [[:u/dept :asc :nulls-last]]}))))

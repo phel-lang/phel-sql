@@ -1,0 +1,36 @@
+(ns phel-sql-tests.sql.order-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-order-by-bare
+  (is (= ["SELECT id FROM t ORDER BY id" []]
+         (sql/format {:select [:id] :from [:t] :order-by [:id]}))))
+
+(deftest test-order-by-asc
+  (is (= ["SELECT id FROM t ORDER BY id ASC" []]
+         (sql/format {:select [:id] :from [:t] :order-by [[:id :asc]]}))))
+
+(deftest test-order-by-desc
+  (is (= ["SELECT id FROM t ORDER BY id DESC" []]
+         (sql/format {:select [:id] :from [:t] :order-by [[:id :desc]]}))))
+
+(deftest test-order-by-mixed
+  (is (= ["SELECT id FROM t ORDER BY a ASC, b DESC, c" []]
+         (sql/format {:select [:id] :from [:t]
+                      :order-by [[:a :asc] [:b :desc] :c]}))))
+
+(deftest test-order-by-nulls-first
+  (is (= ["SELECT id FROM t ORDER BY n ASC NULLS FIRST" []]
+         (sql/format {:select [:id] :from [:t] :order-by [[:n :asc :nulls-first]]}))))
+
+(deftest test-order-by-nulls-last
+  (is (= ["SELECT id FROM t ORDER BY n DESC NULLS LAST" []]
+         (sql/format {:select [:id] :from [:t] :order-by [[:n :desc :nulls-last]]}))))
+
+(deftest test-order-by-rejects-bad-direction
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :order-by [[:id :sideways]]}))))
+
+(deftest test-order-by-rejects-bad-nulls
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :order-by [[:n :asc :sometimes]]}))))

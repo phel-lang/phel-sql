@@ -1,0 +1,31 @@
+(ns phel-sql-tests.sql.update-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-update-basic
+  (is (= ["UPDATE users SET status = ?" ["active"]]
+         (sql/format {:update :users :set {:status "active"}}))))
+
+(deftest test-update-multiple-assignments
+  (is (= ["UPDATE users SET age = ?, name = ?" [30 "alice"]]
+         (sql/format {:update :users :set {:name "alice" :age 30}}))))
+
+(deftest test-update-with-where
+  (is (= ["UPDATE users SET status = ? WHERE id = ?" ["banned" 7]]
+         (sql/format {:update :users :set {:status "banned"} :where [:= :id 7]}))))
+
+(deftest test-update-keyword-rhs-is-identifier
+  (is (= ["UPDATE users SET copy = original" []]
+         (sql/format {:update :users :set {:copy :original}}))))
+
+(deftest test-update-with-returning
+  (is (= ["UPDATE users SET status = ? WHERE id = ? RETURNING id, status" ["active" 1]]
+         (sql/format {:update :users :set {:status "active"}
+                      :where [:= :id 1] :returning [:id :status]}))))
+
+(deftest test-update-rejects-empty-set
+  (is (thrown? \InvalidArgumentException (sql/format {:update :users :set {}}))))
+
+(deftest test-update-rejects-non-map-set
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:update :users :set [:status "active"]}))))

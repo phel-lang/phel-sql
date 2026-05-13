@@ -1,0 +1,44 @@
+(ns phel-sql-tests.sql.set-op-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-union
+  (is (= ["(SELECT id FROM a) UNION (SELECT id FROM b)" []]
+         (sql/format {:union [{:select [:id] :from [:a]}
+                              {:select [:id] :from [:b]}]}))))
+
+(deftest test-union-all
+  (is (= ["(SELECT id FROM a) UNION ALL (SELECT id FROM b)" []]
+         (sql/format {:union-all [{:select [:id] :from [:a]}
+                                  {:select [:id] :from [:b]}]}))))
+
+(deftest test-intersect
+  (is (= ["(SELECT id FROM a) INTERSECT (SELECT id FROM b)" []]
+         (sql/format {:intersect [{:select [:id] :from [:a]}
+                                  {:select [:id] :from [:b]}]}))))
+
+(deftest test-except
+  (is (= ["(SELECT id FROM a) EXCEPT (SELECT id FROM b)" []]
+         (sql/format {:except [{:select [:id] :from [:a]}
+                               {:select [:id] :from [:b]}]}))))
+
+(deftest test-set-op-passes-params
+  (is (= ["(SELECT id FROM a WHERE x = ?) UNION (SELECT id FROM b WHERE y = ?)" [1 2]]
+         (sql/format {:union [{:select [:id] :from [:a] :where [:= :x 1]}
+                              {:select [:id] :from [:b] :where [:= :y 2]}]}))))
+
+(deftest test-set-op-three-queries
+  (is (= ["(SELECT id FROM a) UNION (SELECT id FROM b) UNION (SELECT id FROM c)" []]
+         (sql/format {:union [{:select [:id] :from [:a]}
+                              {:select [:id] :from [:b]}
+                              {:select [:id] :from [:c]}]}))))
+
+(deftest test-set-op-rejects-singleton
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:union [{:select [:id] :from [:a]}]}))))
+
+(deftest test-set-op-rejects-extra-keys
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:union [{:select [:id] :from [:a]}
+                                    {:select [:id] :from [:b]}]
+                            :limit 10}))))

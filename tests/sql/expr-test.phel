@@ -1,0 +1,111 @@
+(ns phel-sql-tests.sql.expr-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+;; ---- Function calls ----
+
+(deftest test-fn-no-args
+  (is (= ["SELECT now()" []] (sql/format {:select [[:fn :now]]}))))
+
+(deftest test-fn-star
+  (is (= ["SELECT count(*) FROM users" []]
+         (sql/format {:select [[:fn :count :*]] :from [:users]}))))
+
+(deftest test-fn-with-column
+  (is (= ["SELECT sum(amount) FROM orders" []]
+         (sql/format {:select [[:fn :sum :amount]] :from [:orders]}))))
+
+(deftest test-fn-with-alias
+  (is (= ["SELECT count(*) AS total FROM users" []]
+         (sql/format {:select [[[:fn :count :*] :total]] :from [:users]}))))
+
+(deftest test-fn-with-value-arg
+  (is (= ["SELECT date_trunc(?, created_at) FROM t" ["month"]]
+         (sql/format {:select [[:fn :date_trunc "month" :created_at]] :from [:t]}))))
+
+(deftest test-fn-nested
+  (is (= ["SELECT coalesce(name, ?) FROM t" ["unknown"]]
+         (sql/format {:select [[:fn :coalesce :name "unknown"]] :from [:t]}))))
+
+(deftest test-fn-in-where
+  (is (= ["SELECT id FROM t WHERE lower(name) = ?" ["alice"]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:= [:fn :lower :name] "alice"]}))))
+
+(deftest test-fn-rejects-non-name
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:fn 42 :x]]}))))
+
+;; ---- CAST ----
+
+(deftest test-cast-basic
+  (is (= ["SELECT CAST(id AS INT) FROM t" []]
+         (sql/format {:select [[:cast :id :INT]] :from [:t]}))))
+
+(deftest test-cast-string-type
+  (is (= ["SELECT CAST(price AS DECIMAL(10,2)) FROM t" []]
+         (sql/format {:select [[:cast :price "DECIMAL(10,2)"]] :from [:t]}))))
+
+(deftest test-cast-with-value
+  (is (= ["UPDATE t SET v = CAST(? AS INT)" ["7"]]
+         (sql/format {:update :t :set {:v [:cast "7" :INT]}}))))
+
+(deftest test-cast-rejects-missing-type
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:cast :id nil]]}))))
+
+(deftest test-cast-rejects-bad-type
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:cast :id 42]]}))))
+
+;; ---- CASE ----
+
+(deftest test-case-simple
+  (is (= ["SELECT CASE WHEN status = ? THEN ? WHEN status = ? THEN ? END FROM t"
+          ["a" "Active" "b" "Banned"]]
+         (sql/format {:select [[:case
+                                [:= :status "a"] "Active"
+                                [:= :status "b"] "Banned"]]
+                      :from [:t]}))))
+
+(deftest test-case-with-else
+  (is (= ["SELECT CASE WHEN status = ? THEN ? ELSE ? END FROM t" ["a" "Active" "Unknown"]]
+         (sql/format {:select [[:case [:= :status "a"] "Active" :else "Unknown"]]
+                      :from [:t]}))))
+
+(deftest test-case-then-keyword-is-identifier
+  (is (= ["SELECT CASE WHEN status = ? THEN active_name ELSE inactive_name END FROM t" ["a"]]
+         (sql/format {:select [[:case [:= :status "a"] :active_name :else :inactive_name]]
+                      :from [:t]}))))
+
+(deftest test-case-with-alias
+  (is (= ["SELECT CASE WHEN n > ? THEN ? ELSE ? END AS label FROM t" [0 "pos" "neg"]]
+         (sql/format {:select [[[:case [:> :n 0] "pos" :else "neg"] :label]] :from [:t]}))))
+
+(deftest test-case-rejects-empty
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:case]]}))))
+
+(deftest test-case-rejects-odd-pairs
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:case [:= :a 1] "x" [:= :b 2]]]}))))
+
+(deftest test-case-rejects-misplaced-else
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:case :else "x" [:= :a 1] "y"]]}))))
+
+;; ---- FILTER ----
+
+(deftest test-filter
+  (is (= ["SELECT count(*) FILTER (WHERE status = ?) AS active FROM users" ["active"]]
+         (sql/format {:select [[[:filter [:fn :count :*] [:= :status "active"]] :active]]
+                      :from [:users]}))))
+
+(deftest test-filter-with-over
+  (is (= [(str "SELECT sum(amount) FILTER (WHERE refunded = ?) "
+               "OVER (PARTITION BY user_id) FROM orders")
+          [false]]
+         (sql/format
+           {:select [[:over [:filter [:fn :sum :amount] [:= :refunded false]]
+                      {:partition-by [:user_id]}]]
+            :from [:orders]}))))

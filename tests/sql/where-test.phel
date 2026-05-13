@@ -1,0 +1,136 @@
+(ns phel-sql-tests.sql.where-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+;; ---- Binary comparison ----
+
+(deftest test-where-eq
+  (is (= ["SELECT id FROM users WHERE status = ?" ["active"]]
+         (sql/format {:select [:id] :from [:users] :where [:= :status "active"]}))))
+
+(deftest test-where-neq
+  (is (= ["SELECT id FROM users WHERE status != ?" ["banned"]]
+         (sql/format {:select [:id] :from [:users] :where [:!= :status "banned"]}))))
+
+(deftest test-where-lt-gt-le-ge
+  (is (= ["SELECT id FROM t WHERE n < ?" [5]]
+         (sql/format {:select [:id] :from [:t] :where [:< :n 5]})))
+  (is (= ["SELECT id FROM t WHERE n > ?" [5]]
+         (sql/format {:select [:id] :from [:t] :where [:> :n 5]})))
+  (is (= ["SELECT id FROM t WHERE n <= ?" [5]]
+         (sql/format {:select [:id] :from [:t] :where [:<= :n 5]})))
+  (is (= ["SELECT id FROM t WHERE n >= ?" [5]]
+         (sql/format {:select [:id] :from [:t] :where [:>= :n 5]}))))
+
+(deftest test-where-like
+  (is (= ["SELECT id FROM t WHERE name LIKE ?" ["A%"]]
+         (sql/format {:select [:id] :from [:t] :where [:like :name "A%"]}))))
+
+(deftest test-where-not-like
+  (is (= ["SELECT id FROM t WHERE name NOT LIKE ?" ["A%"]]
+         (sql/format {:select [:id] :from [:t] :where [:not-like :name "A%"]}))))
+
+(deftest test-where-ilike
+  (is (= ["SELECT id FROM t WHERE name ILIKE ?" ["a%"]]
+         (sql/format {:select [:id] :from [:t] :where [:ilike :name "a%"]}))))
+
+(deftest test-where-not-ilike
+  (is (= ["SELECT id FROM t WHERE name NOT ILIKE ?" ["a%"]]
+         (sql/format {:select [:id] :from [:t] :where [:not-ilike :name "a%"]}))))
+
+(deftest test-where-keyword-on-rhs-is-identifier
+  (is (= ["SELECT id FROM t WHERE a = b" []]
+         (sql/format {:select [:id] :from [:t] :where [:= :a :b]}))))
+
+;; ---- Logical ----
+
+(deftest test-where-and
+  (is (= ["SELECT id FROM t WHERE (a = ?) AND (b = ?)" [1 2]]
+         (sql/format {:select [:id] :from [:t] :where [:and [:= :a 1] [:= :b 2]]}))))
+
+(deftest test-where-or
+  (is (= ["SELECT id FROM t WHERE (a = ?) OR (b = ?)" [1 2]]
+         (sql/format {:select [:id] :from [:t] :where [:or [:= :a 1] [:= :b 2]]}))))
+
+(deftest test-where-not
+  (is (= ["SELECT id FROM t WHERE NOT (a = ?)" [1]]
+         (sql/format {:select [:id] :from [:t] :where [:not [:= :a 1]]}))))
+
+(deftest test-where-nested-and-or
+  (is (= ["SELECT id FROM t WHERE (a = ?) AND ((b = ?) OR (c = ?))" [1 2 3]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:and [:= :a 1] [:or [:= :b 2] [:= :c 3]]]}))))
+
+;; ---- Set / range / null ----
+
+(deftest test-where-in
+  (is (= ["SELECT id FROM t WHERE id IN (?, ?, ?)" [1 2 3]]
+         (sql/format {:select [:id] :from [:t] :where [:in :id [1 2 3]]}))))
+
+(deftest test-where-not-in
+  (is (= ["SELECT id FROM t WHERE status NOT IN (?, ?)" ["x" "y"]]
+         (sql/format {:select [:id] :from [:t] :where [:not-in :status ["x" "y"]]}))))
+
+(deftest test-where-between
+  (is (= ["SELECT id FROM t WHERE n BETWEEN ? AND ?" [1 10]]
+         (sql/format {:select [:id] :from [:t] :where [:between :n 1 10]}))))
+
+(deftest test-where-not-between
+  (is (= ["SELECT id FROM t WHERE n NOT BETWEEN ? AND ?" [1 10]]
+         (sql/format {:select [:id] :from [:t] :where [:not-between :n 1 10]}))))
+
+(deftest test-where-is-null
+  (is (= ["SELECT id FROM t WHERE deleted_at IS NULL" []]
+         (sql/format {:select [:id] :from [:t] :where [:is-null :deleted_at]}))))
+
+(deftest test-where-is-not-null
+  (is (= ["SELECT id FROM t WHERE deleted_at IS NOT NULL" []]
+         (sql/format {:select [:id] :from [:t] :where [:is-not-null :deleted_at]}))))
+
+;; ---- EXISTS ----
+
+(deftest test-where-exists
+  (is (= ["SELECT id FROM t WHERE EXISTS (SELECT 1 FROM u WHERE u.id = t.id)" []]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:exists {:select ["1"] :from [:u]
+                                       :where [:= :u/id :t/id]}]}))))
+
+(deftest test-where-not-exists
+  (is (= ["SELECT id FROM t WHERE NOT EXISTS (SELECT 1 FROM u)" []]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:not-exists {:select ["1"] :from [:u]}]}))))
+
+;; ---- Operand routing: fn on either side ----
+
+(deftest test-in-with-fn-lhs
+  (is (= ["SELECT id FROM t WHERE lower(name) IN (?, ?)" ["a" "b"]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:in [:fn :lower :name] ["a" "b"]]}))))
+
+(deftest test-between-with-fn-lhs
+  (is (= ["SELECT id FROM t WHERE abs(n) BETWEEN ? AND ?" [1 10]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:between [:fn :abs :n] 1 10]}))))
+
+(deftest test-is-null-with-fn
+  (is (= ["SELECT id FROM t WHERE coalesce(a, b) IS NULL" []]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:is-null [:fn :coalesce :a :b]]}))))
+
+;; ---- Error paths ----
+
+(deftest test-rejects-unknown-where-operator
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where [:wat :a 1]}))))
+
+(deftest test-rejects-non-vector-where
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where "broken"}))))
+
+(deftest test-rejects-empty-in-list
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where [:in :id []]}))))
+
+(deftest test-rejects-empty-and
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where [:and]}))))

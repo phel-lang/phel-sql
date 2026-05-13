@@ -1,0 +1,15 @@
+(ns phel-sql-tests.sql.from-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-from-single-table
+  (is (= ["SELECT id FROM users" []]
+         (sql/format {:select [:id] :from [:users]}))))
+
+(deftest test-from-multiple-tables
+  (is (= ["SELECT id FROM users, orders" []]
+         (sql/format {:select [:id] :from [:users :orders]}))))
+
+(deftest test-from-with-alias
+  (is (= ["SELECT id FROM users AS u" []]
+         (sql/format {:select [:id] :from [[:users :u]]}))))

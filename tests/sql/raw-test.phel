@@ -1,0 +1,16 @@
+(ns phel-sql-tests.sql.raw-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-raw-in-select
+  (is (= ["SELECT COUNT(*) AS total FROM users" []]
+         (sql/format {:select [[[:raw "COUNT(*)"] :total]] :from [:users]}))))
+
+(deftest test-raw-in-where-lhs
+  (is (= ["SELECT id FROM t WHERE LOWER(name) = ?" ["alice"]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:= [:raw "LOWER(name)"] "alice"]}))))
+
+(deftest test-raw-in-order-by
+  (is (= ["SELECT id FROM t ORDER BY RANDOM()" []]
+         (sql/format {:select [:id] :from [:t] :order-by [[:raw "RANDOM()"]]}))))

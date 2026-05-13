@@ -1,0 +1,31 @@
+(ns phel-sql-tests.sql.distinct-on-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-distinct-on
+  (is (= ["SELECT DISTINCT ON (country) id, name FROM users" []]
+         (sql/format {:select-distinct-on {:on [:country] :select [:id :name]}
+                      :from [:users]}))))
+
+(deftest test-distinct-on-multiple
+  (is (= ["SELECT DISTINCT ON (country, city) id, name FROM users ORDER BY country ASC, city ASC" []]
+         (sql/format {:select-distinct-on {:on [:country :city] :select [:id :name]}
+                      :from [:users]
+                      :order-by [[:country :asc] [:city :asc]]}))))
+
+(deftest test-distinct-on-rejects-no-on
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select-distinct-on {:select [:id]} :from [:t]}))))
+
+(deftest test-distinct-on-rejects-empty-on
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select-distinct-on {:on [] :select [:id]} :from [:t]}))))
+
+(deftest test-distinct-on-rejects-unknown-key
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select-distinct-on {:on [:a] :select [:id] :wat 1}
+                            :from [:t]}))))
+
+(deftest test-mutex-select-modes
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :select-distinct [:id] :from [:t]}))))

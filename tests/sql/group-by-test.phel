@@ -1,0 +1,21 @@
+(ns phel-sql-tests.sql.group-by-test
+  (:require phel-sql.sql :as sql)
+  (:require phel.test :refer [deftest is]))
+
+(deftest test-group-by
+  (is (= ["SELECT country FROM users GROUP BY country" []]
+         (sql/format {:select [:country] :from [:users] :group-by [:country]}))))
+
+(deftest test-having
+  (is (= ["SELECT country FROM users GROUP BY country HAVING COUNT(*) > ?" [10]]
+         (sql/format {:select [:country] :from [:users]
+                      :group-by [:country]
+                      :having [:> [:raw "COUNT(*)"] 10]}))))
+
+(deftest test-group-by-having-complex
+  (is (= ["SELECT dept FROM emp GROUP BY dept HAVING (SUM(salary) > ?) AND (COUNT(*) >= ?)"
+          [100000 5]]
+         (sql/format {:select [:dept] :from [:emp]
+                      :group-by [:dept]
+                      :having [:and [:> [:raw "SUM(salary)"] 100000]
+                               [:>= [:raw "COUNT(*)"] 5]]}))))
