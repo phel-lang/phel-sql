@@ -69,10 +69,12 @@ trap on_exit EXIT
 # ---------------------------------------------------------------------------
 show_help() {
     cat <<EOF
-Usage: ./release.sh <version> [options]
+Usage: ./release.sh [version] [options]
 
 Arguments:
-  <version>           Semver X.Y.Z (e.g. 0.1.0)
+  [version]           Semver X.Y.Z (e.g. 0.1.0). Optional.
+                      If omitted, bumps the minor of the latest git tag
+                      (vX.Y.Z -> vX.(Y+1).0). Falls back to 0.1.0 if no tags.
 
 Options:
   --name "<title>"    Release title suffix shown in GitHub (default: just vX.Y.Z)
@@ -81,9 +83,27 @@ Options:
   -h, --help          Show this help
 
 Examples:
+  ./release.sh                  # auto-bump minor from latest tag
   ./release.sh 0.1.0
   ./release.sh 0.2.0 --name "Window functions" --dry-run
 EOF
+}
+
+# Print next minor version based on latest vX.Y.Z tag. Defaults to 0.1.0.
+compute_next_minor() {
+    local latest major minor
+    latest=$(git -C "$REPO_ROOT" tag -l 'v[0-9]*.[0-9]*.[0-9]*' \
+        | sed 's/^v//' \
+        | sort -t. -k1,1n -k2,2n -k3,3n \
+        | tail -n1)
+
+    if [[ -z "$latest" ]]; then
+        echo "0.1.0"
+        return
+    fi
+
+    IFS='.' read -r major minor _ <<<"$latest"
+    echo "${major}.$((minor + 1)).0"
 }
 
 parse_args() {
@@ -105,9 +125,8 @@ parse_args() {
     done
 
     if [[ -z "$NEW_VERSION" ]]; then
-        log_err "Missing <version> argument"
-        show_help
-        exit 1
+        NEW_VERSION=$(compute_next_minor)
+        log "No version specified - auto-bumping minor to ${BOLD}$NEW_VERSION${NC}"
     fi
 }
 
