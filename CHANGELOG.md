@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-05-13
+
 ### Added
 - `sql/format` with MVP clause set: `SELECT`, `FROM`, `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`, `OFFSET`.
 - Full clause coverage: joins, subqueries, DML (`INSERT` / `UPDATE` / `DELETE`), set operations (`UNION` / `INTERSECT` / `EXCEPT`), raw SQL passthrough.
@@ -20,4 +22,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed namespace `phel-sql.sql` → `phel.sql`.
 - Retargeted package as `phel-sql` library; trimmed CI workflow and removed CLI/Docker scaffolding.
 
-[Unreleased]: https://github.com/phel-lang/phel-sql/commits/main
+[Unreleased]: https://github.com/phel-lang/phel-sql/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/phel-lang/phel-sql/releases/tag/v0.1.0
