@@ -1,4 +1,4 @@
-(in-ns phel-sql.sql)
+(in-ns phel.sql)
 
 (defn- emit-order-item [item]
   (cond
@@ -6,12 +6,12 @@
     (ident+ item)
 
     (vector? item)
-    (let [[col dir nulls] item
-          dir-sql (case dir
+    (let [[col dir nulls]  item
+          dir-sql          (case dir
                     :asc  "ASC"
                     :desc "DESC"
                     (bad-arg (str "order direction must be :asc or :desc, got: " (show dir))))
-          nulls-sql (when nulls
+          nulls-sql        (when nulls
                       (case nulls
                         :nulls-first "NULLS FIRST"
                         :nulls-last  "NULLS LAST"
@@ -19,7 +19,7 @@
           [c-sql c-params] (ident+ col)]
       [(str c-sql " " dir-sql (when nulls-sql (str " " nulls-sql))) c-params])
 
-    :else (bad-arg (str "Unsupported order-by item: " (show item)))))
+    :else                                           (bad-arg (str "Unsupported order-by item: " (show item)))))
 
 (defn- emit-order-fragments [items]
   (let [parts (map emit-order-item items)]

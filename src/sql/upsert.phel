@@ -1,4 +1,4 @@
-(in-ns phel-sql.sql)
+(in-ns phel.sql)
 
 (defn- emit-on-conflict-target [target]
   (cond
@@ -17,18 +17,18 @@
 
 (defn- emit-on-conflict-block [query]
   (when (contains? query :on-conflict)
-    (let [target (get query :on-conflict)
+    (let [target                     (get query :on-conflict)
           [target-sql target-params] (emit-on-conflict-target target)
-          where-sql (when (contains? query :on-conflict-where)
+          where-sql                  (when (contains? query :on-conflict-where)
                       (emit-where (get query :on-conflict-where)))
-          do-nothing? (get query :do-nothing)
-          do-update (get query :do-update-set)
-          do-update-where (get query :do-update-where)]
+          do-nothing?                (get query :do-nothing)
+          do-update                  (get query :do-update-set)
+          do-update-where            (get query :do-update-where)]
       (when (and do-nothing? do-update)
         (bad-arg ":do-nothing and :do-update-set are mutually exclusive"))
       (when (and (contains? query :on-conflict-where) (not (contains? query :on-conflict)))
         (bad-arg ":on-conflict-where requires :on-conflict"))
-      (let [head (str "ON CONFLICT" target-sql
+      (let [head        (str "ON CONFLICT" target-sql
                       (when where-sql (str " WHERE " (first where-sql))))
             head-params (concat target-params (if where-sql (second where-sql) []))]
         (cond
@@ -37,7 +37,7 @@
 
           do-update
           (let [[set-sql set-params] (emit-set do-update)
-                upd-where (when do-update-where (emit-where do-update-where))]
+                upd-where            (when do-update-where (emit-where do-update-where))]
             [(str head " DO UPDATE " set-sql
                   (when upd-where (str " WHERE " (first upd-where))))
              (concat head-params set-params (if upd-where (second upd-where) []))])

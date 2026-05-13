@@ -1,4 +1,4 @@
-(in-ns phel-sql.sql)
+(in-ns phel.sql)
 
 ;; ===========================================================================
 ;; Per-statement clause dispatch
@@ -72,7 +72,7 @@
 ;; ===========================================================================
 
 (defn- mutex-select-mode! [query]
-  (let [modes [:select :select-distinct :select-distinct-on]
+  (let [modes   [:select :select-distinct :select-distinct-on]
         present (filter (fn [k] (contains? query k)) modes)]
     (when (> (count present) 1)
       (bad-arg (str "Only one of " (str/join " / " (map name modes))
@@ -80,16 +80,16 @@
 
 (defn- statement-type [query]
   (cond
-    (some (fn [k] (contains? query k)) set-op-keywords) :set-op
-    (contains? query :insert-into) :insert
-    (contains? query :update)      :update
-    (contains? query :delete-from) :delete
+    (some (fn [k] (contains? query k)) set-op-keywords)                                                                                                                                                                    :set-op
+    (contains? query :insert-into)                                                                                                                                                                                         :insert
+    (contains? query :update)                                                                                                                                                                                              :update
+    (contains? query :delete-from)                                                                                                                                                                                         :delete
     (and (contains? query :values)
          (not (contains? query :select))
          (not (contains? query :select-distinct))
          (not (contains? query :select-distinct-on))
          (not (contains? query :from))) :values-only
-    :else :select))
+    :else                                                                                                                                                                                                                  :select))
 
 (defn- check-unknown! [query allowed]
   (let [unknown (->> (keys query)
@@ -101,7 +101,7 @@
 (defn- emit-ordered [query emitters clause-order]
   (check-unknown! query (set clause-order))
   (let [present (filter (fn [k] (contains? query k)) clause-order)
-        parts (map (fn [k] ((get emitters k) (get query k))) present)]
+        parts   (map (fn [k] ((get emitters k) (get query k))) present)]
     [(str/join " " (sqls-of parts)) (vec (params-of parts))]))
 
 (defn- emit-select-stmt [q]
@@ -122,27 +122,27 @@
   (when-not (contains? query :values)      (bad-arg "insert statement requires :values"))
   (when (and (contains? query :on-conflict) (contains? query :on-duplicate-key-update))
     (bad-arg ":on-conflict and :on-duplicate-key-update are mutually exclusive"))
-  (let [vs (normalise-values (get query :values))
-        columns-sql (cond
+  (let [vs                (normalise-values (get query :values))
+        columns-sql       (cond
                       (contains? query :columns) (first (emit-columns (get query :columns)))
                       :else                      (get vs :columns-sql))
-        head (cond-> []
-               (contains? query :with)           (conj (emit-with           (get query :with)))
-               (contains? query :with-recursive) (conj (emit-with-recursive (get query :with-recursive))))
-        body [(emit-insert-into (get query :insert-into))]
-        conflict (emit-on-conflict-block query)
-        odku (when (contains? query :on-duplicate-key-update)
+        head              (cond-> []
+                     (contains? query :with)           (conj (emit-with           (get query :with)))
+                     (contains? query :with-recursive) (conj (emit-with-recursive (get query :with-recursive))))
+        body              [(emit-insert-into (get query :insert-into))]
+        conflict          (emit-on-conflict-block query)
+        odku              (when (contains? query :on-duplicate-key-update)
                (emit-on-duplicate-key-update (get query :on-duplicate-key-update)))
-        tail (cond-> []
-               conflict (conj conflict)
-               odku     (conj odku)
-               (contains? query :returning) (conj (emit-returning (get query :returning))))
+        tail              (cond-> []
+                     conflict (conj conflict)
+                     odku     (conj odku)
+                     (contains? query :returning) (conj (emit-returning (get query :returning))))
         leading-fragments (concat head body)
-        leading-sql (str/join " " (sqls-of leading-fragments))
-        leading-params (vec (params-of leading-fragments))
-        tail-sql (str/join " " (sqls-of tail))
-        tail-params (vec (params-of tail))
-        all-sql (str/join " "
+        leading-sql       (str/join " " (sqls-of leading-fragments))
+        leading-params    (vec (params-of leading-fragments))
+        tail-sql          (str/join " " (sqls-of tail))
+        tail-params       (vec (params-of tail))
+        all-sql           (str/join " "
                           (filter (fn [s] (not (empty? s)))
                                   [leading-sql
                                    columns-sql
@@ -159,7 +159,7 @@
   (first (filter (fn [k] (contains? query k)) set-op-keywords)))
 
 (defn- emit-set-op-stmt [query]
-  (let [op (find-set-op query)
+  (let [op     (find-set-op query)
         extras (filter (fn [k] (not= k op)) (keys query))]
     (when (seq extras)
       (bad-arg (str "set-op query supports only one of "
@@ -169,7 +169,7 @@
       (when-not (and (vector? queries) (>= (count queries) 2))
         (bad-arg (str (name op) " expects a vector of at least two queries")))
       (let [parts (map compile-query queries)
-            sqls (map (fn [[s _]] (str "(" s ")")) parts)]
+            sqls  (map (fn [[s _]] (str "(" s ")")) parts)]
         [(str/join (str " " (get set-op-sql op) " ") sqls) (vec (params-of parts))]))))
 
 (defn- compile-query [query]

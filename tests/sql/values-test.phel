@@ -1,5 +1,5 @@
 (ns phel-sql-tests.sql.values-test
-  (:require phel-sql.sql :as sql)
+  (:require phel.sql :as sql)
   (:require phel.test :refer [deftest is]))
 
 (deftest test-top-level-values-vector-rows

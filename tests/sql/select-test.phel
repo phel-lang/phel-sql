@@ -1,5 +1,5 @@
 (ns phel-sql-tests.sql.select-test
-  (:require phel-sql.sql :as sql)
+  (:require phel.sql :as sql)
   (:require phel.test :refer [deftest is testing]))
 
 (deftest test-select-single-column
@@ -31,5 +31,5 @@
 
 (deftest test-clause-order-is-fixed
   (testing "input map key order does not affect emission"
-    (is (= (sql/format {:select [:id] :from [:t] :where [:= :a 1] :limit 5})
-           (sql/format {:limit 5 :where [:= :a 1] :from [:t] :select [:id]})))))
+           (is (= (sql/format {:select [:id] :from [:t] :where [:= :a 1] :limit 5})
+                  (sql/format {:limit 5 :where [:= :a 1] :from [:t] :select [:id]})))))

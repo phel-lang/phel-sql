@@ -1,4 +1,4 @@
-(in-ns phel-sql.sql)
+(in-ns phel.sql)
 
 ;; ===========================================================================
 ;; Simple SELECT-side clauses
@@ -25,7 +25,7 @@
       (bad-arg ":select-distinct-on requires a non-empty :on vector"))
     (when-not (and (vector? sel-cols) (seq sel-cols))
       (bad-arg ":select-distinct-on requires a non-empty :select vector"))
-    (let [[on-sql on-params] (idents+ on-cols)
+    (let [[on-sql on-params]   (idents+ on-cols)
           [sel-sql sel-params] (idents+ sel-cols)]
       [(str "SELECT DISTINCT ON (" on-sql ") " sel-sql)
        (concat on-params sel-params)])))
@@ -53,11 +53,11 @@
 
 (defn- emit-for [spec]
   (let [[mode lock] (if (vector? spec) spec [spec nil])
-        mode-sql (or (get for-modes mode)
+        mode-sql    (or (get for-modes mode)
                      (bad-arg (str "for mode must be one of "
                                    (str/join ", " (map name (keys for-modes)))
                                    ", got: " (show mode))))
-        lock-sql (when lock
+        lock-sql    (when lock
                    (or (get for-locks lock)
                        (bad-arg (str "for lock must be :nowait or :skip-locked, got: " (show lock)))))]
     [(if lock-sql (str "FOR " mode-sql " " lock-sql) (str "FOR " mode-sql)) []]))

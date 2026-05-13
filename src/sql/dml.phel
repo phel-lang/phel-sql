@@ -1,4 +1,4 @@
-(in-ns phel-sql.sql)
+(in-ns phel.sql)
 
 (defn- emit-update      [t] (prefixed "UPDATE"      (ident+ t)))
 (defn- emit-delete-from [t] (prefixed "DELETE FROM" (ident+ t)))

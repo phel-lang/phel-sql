@@ -1,4 +1,4 @@
-(in-ns phel-sql.sql)
+(in-ns phel.sql)
 
 ;; ===========================================================================
 ;; Function calls, CAST, CASE, OVER, FILTER, LATERAL
@@ -14,11 +14,11 @@
 (defn- emit-cast [[_ x type-spec]]
   (when (nil? type-spec)
     (bad-arg "cast expects [:cast expr type]"))
-  (let [[s p] (operand x)
+  (let [[s p]    (operand x)
         type-sql (cond
                    (keyword? type-spec) (name type-spec)
                    (string? type-spec)  type-spec
-                   :else (bad-arg (str "cast type must be a keyword or string, got: " (show type-spec))))]
+                   :else                (bad-arg (str "cast type must be a keyword or string, got: " (show type-spec))))]
     [(str "CAST(" s " AS " type-sql ")") p]))
 
 (defn- split-case-args
@@ -26,10 +26,10 @@
    the final default. Returns [pairs default-or-nil]."
   [args]
   (loop [remaining args
-         pairs []
-         default nil]
+         pairs     []
+         default   nil]
     (cond
-      (empty? remaining) [pairs default]
+      (empty? remaining)          [pairs default]
 
       (= (first remaining) :else)
       (do
@@ -55,10 +55,10 @@
                   [v-sql v-p] (operand then)]
               [(str "WHEN " t-sql " THEN " v-sql)
                (concat t-p v-p)]))
-          else-fragment (when-not (nil? default)
+          else-fragment  (when-not (nil? default)
                           (let [[s p] (operand default)]
                             [(str "ELSE " s) p]))
-          all (if else-fragment
+          all            (if else-fragment
                 (concat pair-fragments [else-fragment])
                 pair-fragments)]
       [(str "CASE " (str/join " " (sqls-of all)) " END")
@@ -80,14 +80,14 @@
 
 (defn- emit-frame-token [t]
   (cond
-    (keyword? t) (or (get frame-tokens t)
+    (keyword? t)                                        (or (get frame-tokens t)
                      (bad-arg (str "Unknown frame token: " (show t))))
     (and (vector? t) (= 2 (count t)) (int? (second t)))
     (case (first t)
       :preceding (str (second t) " PRECEDING")
       :following (str (second t) " FOLLOWING")
       (bad-arg (str "Unknown frame modifier: " (show (first t)))))
-    :else (bad-arg (str "Unsupported frame token: " (show t)))))
+    :else                                               (bad-arg (str "Unsupported frame token: " (show t)))))
 
 (defn- emit-frame [tokens]
   (when-not (and (vector? tokens) (seq tokens))
@@ -103,11 +103,11 @@
       (bad-arg (str "Unknown window-spec key(s): " (str/join ", " (map name unknown))))))
   (let [pieces (atom [])
         params (atom [])
-        push! (fn [s p]
+        push!  (fn [s p]
                 (swap! pieces conj s)
                 (reset! params (concat (deref params) p)))]
     (when (contains? m :partition-by)
-      (let [cols (get m :partition-by)
+      (let [cols  (get m :partition-by)
             parts (map ident+ cols)]
         (push! (str "PARTITION BY " (str/join ", " (sqls-of parts)))
                (params-of parts))))

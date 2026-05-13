@@ -28,7 +28,7 @@ composer repl
 ```
 
 ```phel
-phel:1> (require phel-sql.sql :as sql)
+phel:1> (require phel.sql :as sql)
 phel:2> (sql/format {:select [:id] :from [:users]})
 ```
 

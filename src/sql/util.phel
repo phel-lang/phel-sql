@@ -1,4 +1,4 @@
-(in-ns phel-sql.sql)
+(in-ns phel.sql)
 
 (defn- bad-arg [msg]
   (throw (php/new \InvalidArgumentException msg)))

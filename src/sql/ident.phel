@@ -1,4 +1,4 @@
-(in-ns phel-sql.sql)
+(in-ns phel.sql)
 
 (def- expr-tags #{:raw :fn :cast :case :over :filter :lateral})
 
@@ -16,7 +16,7 @@
                    (str ns "." (name x))
                    (name x))
     (string? x)  x
-    :else (bad-arg (str "Unsupported identifier: " (show x)))))
+    :else        (bad-arg (str "Unsupported identifier: " (show x)))))
 
 (defn- ident+
   "Identifier with optional params. Accepts everything `ident` does, plus
@@ -29,10 +29,10 @@
     (tagged? x)   (emit-tagged x)
     (subquery? x) (let [[s p] (compile-query x)] [(str "(" s ")") p])
     (vector? x)
-    (let [[base alias] x
+    (let [[base alias]     x
           [b-sql b-params] (ident+ base)]
       [(str b-sql " AS " (ident alias)) b-params])
-    :else [(ident x) []]))
+    :else         [(ident x) []]))
 
 (defn- idents+ [xs]
   (let [parts (map ident+ xs)]

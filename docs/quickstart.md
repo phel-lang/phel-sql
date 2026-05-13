@@ -10,7 +10,7 @@ composer require phel-lang/phel-sql
 
 ```phel
 (ns my-app.queries
-  (:require phel-sql.sql :as sql))
+  (:require phel.sql :as sql))
 ```
 
 ## Three queries

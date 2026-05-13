@@ -24,7 +24,7 @@ Requires PHP 8.4+ and `phel-lang/phel-lang` 0.37+.
 
 ```phel
 (ns my-app.queries
-  (:require phel-sql.sql :as sql))
+  (:require phel.sql :as sql))
 
 (sql/format
   {:with     [[:active {:select [:id] :from [:users] :where [:= :status "active"]}]]

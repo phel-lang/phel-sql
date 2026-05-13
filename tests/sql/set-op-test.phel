@@ -1,5 +1,5 @@
 (ns phel-sql-tests.sql.set-op-test
-  (:require phel-sql.sql :as sql)
+  (:require phel.sql :as sql)
   (:require phel.test :refer [deftest is]))
 
 (deftest test-union

@@ -1,4 +1,4 @@
-(in-ns phel-sql.sql)
+(in-ns phel.sql)
 
 (defn- emit-join-on [on]
   (cond
@@ -28,7 +28,7 @@
   (when-not (and (vector? tables) (seq tables))
     (bad-arg "cross-join expects a non-empty vector of tables"))
   (let [parts (map ident+ tables)
-        sqls (map (fn [[s _]] (str "CROSS JOIN " s)) parts)]
+        sqls  (map (fn [[s _]] (str "CROSS JOIN " s)) parts)]
     [(str/join " " sqls) (params-of parts)]))
 
 (defn- emit-join       [pairs] (emit-join-list "JOIN"       pairs))

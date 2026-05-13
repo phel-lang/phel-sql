@@ -1,5 +1,5 @@
 (ns phel-sql-tests.sql.expr-test
-  (:require phel-sql.sql :as sql)
+  (:require phel.sql :as sql)
   (:require phel.test :refer [deftest is]))
 
 ;; ---- Function calls ----
@@ -106,6 +106,6 @@
                "OVER (PARTITION BY user_id) FROM orders")
           [false]]
          (sql/format
-           {:select [[:over [:filter [:fn :sum :amount] [:= :refunded false]]
-                      {:partition-by [:user_id]}]]
-            :from [:orders]}))))
+          {:select [[:over [:filter [:fn :sum :amount] [:= :refunded false]]
+                     {:partition-by [:user_id]}]]
+           :from [:orders]}))))

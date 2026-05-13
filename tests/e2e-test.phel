@@ -1,5 +1,5 @@
 (ns phel-sql-tests.e2e-test
-  (:require phel-sql.sql :as sql)
+  (:require phel.sql :as sql)
   (:require phel.test :refer [deftest is testing]))
 
 ;; ===========================================================================
@@ -14,187 +14,187 @@
 
 (deftest e2e-user-dashboard-page
   (testing "paginated dashboard: CTE + alias + join + filter + order + limit"
-    (is (= [(str "WITH recent_orders AS (SELECT user_id, count(*) AS n FROM orders "
-                 "WHERE created_at >= ? GROUP BY user_id) "
-                 "SELECT u.id, u.name, r.n "
-                 "FROM users AS u "
-                 "JOIN recent_orders AS r ON u.id = r.user_id "
-                 "WHERE u.status = ? "
-                 "ORDER BY r.n DESC "
-                 "LIMIT 25 OFFSET 50")
-            ["2026-01-01" "active"]]
-           (sql/format
-             {:with [[:recent_orders
-                      {:select [:user_id [[:fn :count :*] :n]]
-                       :from [:orders]
-                       :where [:>= :created_at "2026-01-01"]
-                       :group-by [:user_id]}]]
-              :select   [:u/id :u/name :r/n]
-              :from     [[:users :u]]
-              :join     [[:recent_orders :r] [:= :u/id :r/user_id]]
-              :where    [:= :u/status "active"]
-              :order-by [[:r/n :desc]]
-              :limit    25
-              :offset   50})))))
+           (is (= [(str "WITH recent_orders AS (SELECT user_id, count(*) AS n FROM orders "
+                        "WHERE created_at >= ? GROUP BY user_id) "
+                        "SELECT u.id, u.name, r.n "
+                        "FROM users AS u "
+                        "JOIN recent_orders AS r ON u.id = r.user_id "
+                        "WHERE u.status = ? "
+                        "ORDER BY r.n DESC "
+                        "LIMIT 25 OFFSET 50")
+                   ["2026-01-01" "active"]]
+                  (sql/format
+                   {:with [[:recent_orders
+                            {:select [:user_id [[:fn :count :*] :n]]
+                             :from [:orders]
+                             :where [:>= :created_at "2026-01-01"]
+                             :group-by [:user_id]}]]
+                    :select   [:u/id :u/name :r/n]
+                    :from     [[:users :u]]
+                    :join     [[:recent_orders :r] [:= :u/id :r/user_id]]
+                    :where    [:= :u/status "active"]
+                    :order-by [[:r/n :desc]]
+                    :limit    25
+                    :offset   50})))))
 
 (deftest e2e-analytics-rollup
   (testing "aggregation: group + having + filter aggregate + window for ranking"
-    (is (= [(str "SELECT country, "
-                 "count(*) FILTER (WHERE active = ?) AS active_users, "
-                 "row_number() OVER (ORDER BY count(*) DESC) AS rk "
-                 "FROM users "
-                 "GROUP BY country "
-                 "HAVING count(*) >= ?")
-            [true 100]]
-           (sql/format
-             {:select [:country
-                       [[:filter [:fn :count :*] [:= :active true]] :active_users]
-                       [[:over [:fn :row_number] {:order-by [[[:fn :count :*] :desc]]}] :rk]]
-              :from [:users]
-              :group-by [:country]
-              :having [:>= [:fn :count :*] 100]})))))
+           (is (= [(str "SELECT country, "
+                        "count(*) FILTER (WHERE active = ?) AS active_users, "
+                        "row_number() OVER (ORDER BY count(*) DESC) AS rk "
+                        "FROM users "
+                        "GROUP BY country "
+                        "HAVING count(*) >= ?")
+                   [true 100]]
+                  (sql/format
+                   {:select [:country
+                             [[:filter [:fn :count :*] [:= :active true]] :active_users]
+                             [[:over [:fn :row_number] {:order-by [[[:fn :count :*] :desc]]}] :rk]]
+                    :from [:users]
+                    :group-by [:country]
+                    :having [:>= [:fn :count :*] 100]})))))
 
 (deftest e2e-postgres-upsert
   (testing "PG upsert with EXCLUDED-style update + returning"
-    (is (= [(str "INSERT INTO users (email, name) VALUES (?, ?) "
-                 "ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name "
-                 "RETURNING id, email")
-            ["a@x.com" "Alice"]]
-           (sql/format
-             {:insert-into :users
-              :values [{:email "a@x.com" :name "Alice"}]
-              :on-conflict [:email]
-              :do-update-set {:name [:raw "EXCLUDED.name"]}
-              :returning [:id :email]})))))
+           (is (= [(str "INSERT INTO users (email, name) VALUES (?, ?) "
+                        "ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name "
+                        "RETURNING id, email")
+                   ["a@x.com" "Alice"]]
+                  (sql/format
+                   {:insert-into :users
+                    :values [{:email "a@x.com" :name "Alice"}]
+                    :on-conflict [:email]
+                    :do-update-set {:name [:raw "EXCLUDED.name"]}
+                    :returning [:id :email]})))))
 
 (deftest e2e-mysql-upsert
   (testing "MySQL upsert with VALUES(col) reference"
-    (is (= [(str "INSERT INTO counters (key, n) VALUES (?, ?) "
-                 "ON DUPLICATE KEY UPDATE n = n + VALUES(n)")
-            ["visits" 1]]
-           (sql/format
-             {:insert-into :counters
-              :values [{:key "visits" :n 1}]
-              :on-duplicate-key-update {:n [:raw "n + VALUES(n)"]}})))))
+           (is (= [(str "INSERT INTO counters (key, n) VALUES (?, ?) "
+                        "ON DUPLICATE KEY UPDATE n = n + VALUES(n)")
+                   ["visits" 1]]
+                  (sql/format
+                   {:insert-into :counters
+                    :values [{:key "visits" :n 1}]
+                    :on-duplicate-key-update {:n [:raw "n + VALUES(n)"]}})))))
 
 (deftest e2e-soft-delete-with-exists
   (testing "filter users who do not have a deletion record"
-    (is (= [(str "UPDATE users SET status = ?, updated_at = NOW() "
-                 "WHERE (id = ?) AND (NOT EXISTS (SELECT 1 FROM deletions "
-                 "WHERE user_id = users.id))")
-            ["archived" 42]]
-           (sql/format
-             {:update :users
-              :set {:status "archived"
-                    :updated_at [:raw "NOW()"]}
-              :where [:and
-                      [:= :id 42]
-                      [:not-exists {:select ["1"]
-                                    :from [:deletions]
-                                    :where [:= :user_id :users/id]}]]})))))
+           (is (= [(str "UPDATE users SET status = ?, updated_at = NOW() "
+                        "WHERE (id = ?) AND (NOT EXISTS (SELECT 1 FROM deletions "
+                        "WHERE user_id = users.id))")
+                   ["archived" 42]]
+                  (sql/format
+                   {:update :users
+                    :set {:status "archived"
+                          :updated_at [:raw "NOW()"]}
+                    :where [:and
+                            [:= :id 42]
+                            [:not-exists {:select ["1"]
+                                          :from [:deletions]
+                                          :where [:= :user_id :users/id]}]]})))))
 
 (deftest e2e-bulk-delete-with-returning
   (testing "bulk delete by IN list + RETURNING the removed rows"
-    (is (= ["DELETE FROM orders WHERE id IN (?, ?, ?) RETURNING id, user_id"
-            [1 2 3]]
-           (sql/format
-             {:delete-from :orders
-              :where [:in :id [1 2 3]]
-              :returning [:id :user_id]})))))
+           (is (= ["DELETE FROM orders WHERE id IN (?, ?, ?) RETURNING id, user_id"
+                   [1 2 3]]
+                  (sql/format
+                   {:delete-from :orders
+                    :where [:in :id [1 2 3]]
+                    :returning [:id :user_id]})))))
 
 (deftest e2e-recursive-cte-graph-walk
   (testing "recursive CTE traversing a parent/child tree"
-    (is (= [(str "WITH RECURSIVE tree AS ((SELECT id, parent_id FROM nodes WHERE id = ?) "
-                 "UNION ALL "
-                 "(SELECT n.id, n.parent_id FROM nodes AS n "
-                 "JOIN tree AS t ON n.parent_id = t.id)) "
-                 "SELECT id FROM tree")
-            [1]]
-           (sql/format
-             {:with-recursive
-              [[:tree
-                {:union-all
-                 [{:select [:id :parent_id]
-                   :from [:nodes]
-                   :where [:= :id 1]}
-                  {:select [:n/id :n/parent_id]
-                   :from [[:nodes :n]]
-                   :join [[:tree :t] [:= :n/parent_id :t/id]]}]}]]
-              :select [:id]
-              :from [:tree]})))))
+           (is (= [(str "WITH RECURSIVE tree AS ((SELECT id, parent_id FROM nodes WHERE id = ?) "
+                        "UNION ALL "
+                        "(SELECT n.id, n.parent_id FROM nodes AS n "
+                        "JOIN tree AS t ON n.parent_id = t.id)) "
+                        "SELECT id FROM tree")
+                   [1]]
+                  (sql/format
+                   {:with-recursive
+                    [[:tree
+                      {:union-all
+                       [{:select [:id :parent_id]
+                         :from [:nodes]
+                         :where [:= :id 1]}
+                        {:select [:n/id :n/parent_id]
+                         :from [[:nodes :n]]
+                         :join [[:tree :t] [:= :n/parent_id :t/id]]}]}]]
+                    :select [:id]
+                    :from [:tree]})))))
 
 (deftest e2e-distinct-on-latest-per-group
   (testing "Postgres DISTINCT ON for the latest row per user"
-    (is (= [(str "SELECT DISTINCT ON (user_id) user_id, id, created_at "
-                 "FROM events "
-                 "ORDER BY user_id ASC, created_at DESC")
-            []]
-           (sql/format
-             {:select-distinct-on {:on [:user_id]
-                                   :select [:user_id :id :created_at]}
-              :from [:events]
-              :order-by [[:user_id :asc] [:created_at :desc]]})))))
+           (is (= [(str "SELECT DISTINCT ON (user_id) user_id, id, created_at "
+                        "FROM events "
+                        "ORDER BY user_id ASC, created_at DESC")
+                   []]
+                  (sql/format
+                   {:select-distinct-on {:on [:user_id]
+                                         :select [:user_id :id :created_at]}
+                    :from [:events]
+                    :order-by [[:user_id :asc] [:created_at :desc]]})))))
 
 (deftest e2e-lateral-join-top-n-per-group
   (testing "top-N orders per user via LATERAL subquery"
-    (is (= [(str "SELECT u.id, o.id, o.amount "
-                 "FROM users AS u "
-                 "JOIN LATERAL (SELECT id, amount FROM orders WHERE user_id = u.id "
-                 "ORDER BY amount DESC LIMIT 3) AS o ON TRUE")
-            []]
-           (sql/format
-             {:select [:u/id :o/id :o/amount]
-              :from [[:users :u]]
-              :join [[[:lateral {:select [:id :amount]
-                                 :from [:orders]
-                                 :where [:= :user_id :u/id]
-                                 :order-by [[:amount :desc]]
-                                 :limit 3}] :o]
-                     [:raw "TRUE"]]})))))
+           (is (= [(str "SELECT u.id, o.id, o.amount "
+                        "FROM users AS u "
+                        "JOIN LATERAL (SELECT id, amount FROM orders WHERE user_id = u.id "
+                        "ORDER BY amount DESC LIMIT 3) AS o ON TRUE")
+                   []]
+                  (sql/format
+                   {:select [:u/id :o/id :o/amount]
+                    :from [[:users :u]]
+                    :join [[[:lateral {:select [:id :amount]
+                                       :from [:orders]
+                                       :where [:= :user_id :u/id]
+                                       :order-by [[:amount :desc]]
+                                       :limit 3}] :o]
+                           [:raw "TRUE"]]})))))
 
 (deftest e2e-union-of-filtered-queries
   (testing "union of two filtered queries with their own params"
-    (is (= [(str "(SELECT id, 'customer' AS source FROM customers WHERE country = ?) "
-                 "UNION ALL "
-                 "(SELECT id, 'lead' AS source FROM leads WHERE country = ?)")
-            ["ES" "ES"]]
-           (sql/format
-             {:union-all [{:select [:id [[:raw "'customer'"] :source]]
-                           :from [:customers]
-                           :where [:= :country "ES"]}
-                          {:select [:id [[:raw "'lead'"] :source]]
-                           :from [:leads]
-                           :where [:= :country "ES"]}]})))))
+           (is (= [(str "(SELECT id, 'customer' AS source FROM customers WHERE country = ?) "
+                        "UNION ALL "
+                        "(SELECT id, 'lead' AS source FROM leads WHERE country = ?)")
+                   ["ES" "ES"]]
+                  (sql/format
+                   {:union-all [{:select [:id [[:raw "'customer'"] :source]]
+                                 :from [:customers]
+                                 :where [:= :country "ES"]}
+                                {:select [:id [[:raw "'lead'"] :source]]
+                                 :from [:leads]
+                                 :where [:= :country "ES"]}]})))))
 
 (deftest e2e-conditional-projection
   (testing "CASE in select to bucket rows + ordering by bucket"
-    (is (= [(str "SELECT id, "
-                 "CASE WHEN amount > ? THEN ? WHEN amount > ? THEN ? ELSE ? END AS tier "
-                 "FROM orders "
-                 "ORDER BY tier ASC")
-            [1000 "gold" 100 "silver" "bronze"]]
-           (sql/format
-             {:select [:id
-                       [[:case
-                         [:> :amount 1000] "gold"
-                         [:> :amount 100]  "silver"
-                         :else             "bronze"]
-                        :tier]]
-              :from [:orders]
-              :order-by [[:tier :asc]]})))))
+           (is (= [(str "SELECT id, "
+                        "CASE WHEN amount > ? THEN ? WHEN amount > ? THEN ? ELSE ? END AS tier "
+                        "FROM orders "
+                        "ORDER BY tier ASC")
+                   [1000 "gold" 100 "silver" "bronze"]]
+                  (sql/format
+                   {:select [:id
+                             [[:case
+                               [:> :amount 1000] "gold"
+                               [:> :amount 100]  "silver"
+                               :else             "bronze"]
+                              :tier]]
+                    :from [:orders]
+                    :order-by [[:tier :asc]]})))))
 
 (deftest e2e-pure-and-deterministic
   (testing "same input always produces same output"
-    (let [q {:select [:id :name :email]
-             :from [:users]
-             :where [:= :status "active"]
-             :order-by [[:created_at :desc]]
-             :limit 10}]
-      (is (= (sql/format q) (sql/format q)))
-      (is (= (sql/format q) (sql/format q)))))
+           (let [q {:select [:id :name :email]
+                    :from [:users]
+                    :where [:= :status "active"]
+                    :order-by [[:created_at :desc]]
+                    :limit 10}]
+             (is (= (sql/format q) (sql/format q)))
+             (is (= (sql/format q) (sql/format q)))))
 
   (testing "no I/O leaks: params come back as a vector, sql as a string"
-    (let [[s p] (sql/format {:select [:id] :from [:t] :where [:= :a 1]})]
-      (is (string? s))
-      (is (vector? p))
-      (is (= [1] p)))))
+           (let [[s p] (sql/format {:select [:id] :from [:t] :where [:= :a 1]})]
+             (is (string? s))
+             (is (vector? p))
+             (is (= [1] p)))))

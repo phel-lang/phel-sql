@@ -1,5 +1,5 @@
 (ns phel-sql-tests.sql.raw-test
-  (:require phel-sql.sql :as sql)
+  (:require phel.sql :as sql)
   (:require phel.test :refer [deftest is]))
 
 (deftest test-raw-in-select

@@ -1,4 +1,4 @@
-(ns phel-sql.sql
+(ns phel.sql
   (:require phel.string :as str))
 
 ;; ===========================================================================
@@ -16,7 +16,7 @@
 (declare emit-order-fragments [items])
 
 ;; ===========================================================================
-;; Load sub-files (each starts with `(in-ns phel-sql.sql)`).
+;; Load sub-files (each starts with `(in-ns phel.sql)`).
 ;; Order matters only when a top-level form references a value that has not
 ;; yet been defined; cross-file fn references are resolved at call time.
 ;; ===========================================================================

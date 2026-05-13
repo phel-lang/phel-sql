@@ -1,4 +1,4 @@
-(in-ns phel-sql.sql)
+(in-ns phel.sql)
 
 (defn- emit-with-list [kw bindings]
   (when-not (and (vector? bindings) (seq bindings))
@@ -7,7 +7,7 @@
                         (when-not (and (vector? binding) (= 2 (count binding)))
                           (bad-arg (str kw " binding must be [name query], got: " (show binding))))
                         (let [[bname q] binding
-                              [s p] (compile-query q)]
+                              [s p]     (compile-query q)]
                           [(str (ident bname) " AS (" s ")") p]))
                       bindings)]
     [(str kw " " (str/join ", " (sqls-of compiled))) (params-of compiled)]))
