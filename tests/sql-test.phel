@@ -1,5 +1,5 @@
-(ns phel-sql-tests\sql-test
-  (:require phel-sql\sql :as sql)
+(ns phel-sql-tests.sql-test
+  (:require phel-sql.sql :as sql)
   (:require phel.test :refer [deftest is testing]))
 
 ;; ---------------------------------------------------------------------------
@@ -193,7 +193,7 @@
 
 (deftest test-rejects-unknown-clause
   (is (thrown? \InvalidArgumentException
-               (sql/format {:select [:id] :group-by [:dept]}))))
+               (sql/format {:select [:id] :wat [:dept]}))))
 
 (deftest test-rejects-unknown-where-operator
   (is (thrown? \InvalidArgumentException
@@ -232,3 +232,413 @@
 (deftest test-rejects-empty-and
   (is (thrown? \InvalidArgumentException
                (sql/format {:select [:id] :from [:t] :where [:and]}))))
+
+;; ===========================================================================
+;; Raw SQL escape hatch
+;; ===========================================================================
+
+(deftest test-raw-in-select
+  (is (= ["SELECT COUNT(*) AS total FROM users" []]
+         (sql/format {:select [[[:raw "COUNT(*)"] :total]]
+                      :from [:users]}))))
+
+(deftest test-raw-in-where-lhs
+  (is (= ["SELECT id FROM t WHERE LOWER(name) = ?" ["alice"]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:= [:raw "LOWER(name)"] "alice"]}))))
+
+(deftest test-raw-in-order-by
+  (is (= ["SELECT id FROM t ORDER BY RANDOM()" []]
+         (sql/format {:select [:id] :from [:t]
+                      :order-by [[:raw "RANDOM()"]]}))))
+
+;; ===========================================================================
+;; SELECT DISTINCT
+;; ===========================================================================
+
+(deftest test-select-distinct
+  (is (= ["SELECT DISTINCT country FROM users" []]
+         (sql/format {:select-distinct [:country] :from [:users]}))))
+
+;; ===========================================================================
+;; Extended WHERE operators
+;; ===========================================================================
+
+(deftest test-where-not-in
+  (is (= ["SELECT id FROM t WHERE status NOT IN (?, ?)" ["x" "y"]]
+         (sql/format {:select [:id] :from [:t] :where [:not-in :status ["x" "y"]]}))))
+
+(deftest test-where-not-like
+  (is (= ["SELECT id FROM t WHERE name NOT LIKE ?" ["A%"]]
+         (sql/format {:select [:id] :from [:t] :where [:not-like :name "A%"]}))))
+
+(deftest test-where-ilike
+  (is (= ["SELECT id FROM t WHERE name ILIKE ?" ["a%"]]
+         (sql/format {:select [:id] :from [:t] :where [:ilike :name "a%"]}))))
+
+(deftest test-where-not-ilike
+  (is (= ["SELECT id FROM t WHERE name NOT ILIKE ?" ["a%"]]
+         (sql/format {:select [:id] :from [:t] :where [:not-ilike :name "a%"]}))))
+
+(deftest test-where-not-between
+  (is (= ["SELECT id FROM t WHERE n NOT BETWEEN ? AND ?" [1 10]]
+         (sql/format {:select [:id] :from [:t] :where [:not-between :n 1 10]}))))
+
+(deftest test-where-exists
+  (is (= ["SELECT id FROM t WHERE EXISTS (SELECT 1 FROM u WHERE u.id = t.id)" []]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:exists {:select ["1"] :from [:u]
+                                       :where [:= :u/id :t/id]}]}))))
+
+(deftest test-where-not-exists
+  (is (= ["SELECT id FROM t WHERE NOT EXISTS (SELECT 1 FROM u)" []]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:not-exists {:select ["1"] :from [:u]}]}))))
+
+;; ===========================================================================
+;; Subqueries
+;; ===========================================================================
+
+(deftest test-subquery-in-where-binary
+  (is (= ["SELECT id FROM t WHERE id = (SELECT MAX(id) FROM t)" []]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:= :id {:select ["MAX(id)"] :from [:t]}]}))))
+
+(deftest test-subquery-in-in
+  (is (= ["SELECT id FROM t WHERE id IN (SELECT user_id FROM banned)" []]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:in :id {:select [:user_id] :from [:banned]}]}))))
+
+(deftest test-subquery-in-from-with-alias
+  (is (= ["SELECT u.id FROM (SELECT id FROM users WHERE active = ?) AS u" [true]]
+         (sql/format {:select [:u/id]
+                      :from [[{:select [:id] :from [:users]
+                               :where [:= :active true]} :u]]}))))
+
+(deftest test-subquery-in-select-with-alias
+  (is (= ["SELECT id, (SELECT COUNT(*) FROM logs WHERE logs.user_id = users.id) AS log_count FROM users"
+          []]
+         (sql/format {:select [:id [{:select ["COUNT(*)"]
+                                     :from [:logs]
+                                     :where [:= :logs/user_id :users/id]} :log_count]]
+                      :from [:users]}))))
+
+;; ===========================================================================
+;; JOIN family
+;; ===========================================================================
+
+(deftest test-inner-join
+  (is (= ["SELECT u.id FROM users AS u JOIN orders AS o ON u.id = o.user_id" []]
+         (sql/format {:select [:u/id]
+                      :from [[:users :u]]
+                      :join [[:orders :o] [:= :u/id :o/user_id]]}))))
+
+(deftest test-left-join
+  (is (= ["SELECT u.id FROM users AS u LEFT JOIN orders AS o ON u.id = o.user_id" []]
+         (sql/format {:select [:u/id]
+                      :from [[:users :u]]
+                      :left-join [[:orders :o] [:= :u/id :o/user_id]]}))))
+
+(deftest test-right-join
+  (is (= ["SELECT id FROM a RIGHT JOIN b ON a.x = b.x" []]
+         (sql/format {:select [:id] :from [:a]
+                      :right-join [:b [:= :a/x :b/x]]}))))
+
+(deftest test-full-join
+  (is (= ["SELECT id FROM a FULL JOIN b ON a.x = b.x" []]
+         (sql/format {:select [:id] :from [:a]
+                      :full-join [:b [:= :a/x :b/x]]}))))
+
+(deftest test-cross-join
+  (is (= ["SELECT id FROM a CROSS JOIN b CROSS JOIN c" []]
+         (sql/format {:select [:id] :from [:a] :cross-join [:b :c]}))))
+
+(deftest test-multiple-joins
+  (is (= ["SELECT u.id FROM users AS u JOIN orders AS o ON u.id = o.user_id JOIN items AS i ON o.id = i.order_id"
+          []]
+         (sql/format {:select [:u/id]
+                      :from [[:users :u]]
+                      :join [[:orders :o] [:= :u/id :o/user_id]
+                             [:items :i]  [:= :o/id :i/order_id]]}))))
+
+(deftest test-join-rejects-odd-pairs
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:a] :join [:b]}))))
+
+;; ===========================================================================
+;; GROUP BY / HAVING
+;; ===========================================================================
+
+(deftest test-group-by
+  (is (= ["SELECT country FROM users GROUP BY country" []]
+         (sql/format {:select [:country] :from [:users] :group-by [:country]}))))
+
+(deftest test-having
+  (is (= ["SELECT country FROM users GROUP BY country HAVING COUNT(*) > ?" [10]]
+         (sql/format {:select [:country] :from [:users]
+                      :group-by [:country]
+                      :having [:> [:raw "COUNT(*)"] 10]}))))
+
+(deftest test-group-by-having-complex
+  (is (= ["SELECT dept FROM emp GROUP BY dept HAVING (SUM(salary) > ?) AND (COUNT(*) >= ?)" [100000 5]]
+         (sql/format {:select [:dept] :from [:emp]
+                      :group-by [:dept]
+                      :having [:and [:> [:raw "SUM(salary)"] 100000]
+                               [:>= [:raw "COUNT(*)"] 5]]}))))
+
+;; ===========================================================================
+;; FOR (lock hints)
+;; ===========================================================================
+
+(deftest test-for-update
+  (is (= ["SELECT id FROM t FOR UPDATE" []]
+         (sql/format {:select [:id] :from [:t] :for :update}))))
+
+(deftest test-for-share
+  (is (= ["SELECT id FROM t FOR SHARE" []]
+         (sql/format {:select [:id] :from [:t] :for :share}))))
+
+(deftest test-for-update-nowait
+  (is (= ["SELECT id FROM t FOR UPDATE NOWAIT" []]
+         (sql/format {:select [:id] :from [:t] :for [:update :nowait]}))))
+
+(deftest test-for-update-skip-locked
+  (is (= ["SELECT id FROM t FOR UPDATE SKIP LOCKED" []]
+         (sql/format {:select [:id] :from [:t] :for [:update :skip-locked]}))))
+
+(deftest test-for-rejects-bad-mode
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :for :wat}))))
+
+(deftest test-for-rejects-bad-lock
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :for [:update :wat]}))))
+
+;; ===========================================================================
+;; WITH (CTEs)
+;; ===========================================================================
+
+(deftest test-with-single-cte
+  (is (= ["WITH active AS (SELECT id FROM users WHERE active = ?) SELECT id FROM active" [true]]
+         (sql/format {:with [[:active {:select [:id] :from [:users]
+                                       :where [:= :active true]}]]
+                      :select [:id]
+                      :from [:active]}))))
+
+(deftest test-with-multiple-ctes
+  (is (= ["WITH a AS (SELECT id FROM t1), b AS (SELECT id FROM t2) SELECT id FROM a JOIN b ON a.id = b.id"
+          []]
+         (sql/format {:with [[:a {:select [:id] :from [:t1]}]
+                             [:b {:select [:id] :from [:t2]}]]
+                      :select [:id]
+                      :from [:a]
+                      :join [:b [:= :a/id :b/id]]}))))
+
+(deftest test-with-recursive
+  (is (= ["WITH RECURSIVE chain AS (SELECT id FROM t) SELECT id FROM chain" []]
+         (sql/format {:with-recursive [[:chain {:select [:id] :from [:t]}]]
+                      :select [:id]
+                      :from [:chain]}))))
+
+(deftest test-with-rejects-empty
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:with [] :select [:id] :from [:t]}))))
+
+(deftest test-with-rejects-bad-binding
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:with [[:only-one-element]]
+                            :select [:id] :from [:t]}))))
+
+;; ===========================================================================
+;; RETURNING
+;; ===========================================================================
+
+(deftest test-returning-on-update
+  (is (= ["UPDATE users SET status = ? WHERE id = ? RETURNING id, status" ["active" 1]]
+         (sql/format {:update :users
+                      :set {:status "active"}
+                      :where [:= :id 1]
+                      :returning [:id :status]}))))
+
+;; ===========================================================================
+;; INSERT
+;; ===========================================================================
+
+(deftest test-insert-vector-rows
+  (is (= ["INSERT INTO users VALUES (?, ?), (?, ?)" ["a" 1 "b" 2]]
+         (sql/format {:insert-into :users
+                      :values [["a" 1] ["b" 2]]}))))
+
+(deftest test-insert-vector-rows-with-columns
+  (is (= ["INSERT INTO users (name, age) VALUES (?, ?), (?, ?)" ["a" 1 "b" 2]]
+         (sql/format {:insert-into :users
+                      :columns [:name :age]
+                      :values [["a" 1] ["b" 2]]}))))
+
+(deftest test-insert-map-rows
+  (is (= ["INSERT INTO users (age, name) VALUES (?, ?), (?, ?)" [1 "a" 2 "b"]]
+         (sql/format {:insert-into :users
+                      :values [{:name "a" :age 1}
+                               {:name "b" :age 2}]}))))
+
+(deftest test-insert-map-rows-union-of-keys
+  (is (= ["INSERT INTO users (age, email, name) VALUES (?, ?, ?), (?, ?, ?)"
+          [1 nil "a" nil "b@x" "b"]]
+         (sql/format {:insert-into :users
+                      :values [{:name "a" :age 1}
+                               {:name "b" :email "b@x"}]}))))
+
+(deftest test-insert-with-returning
+  (is (= ["INSERT INTO users (name) VALUES (?) RETURNING id" ["a"]]
+         (sql/format {:insert-into :users
+                      :values [{:name "a"}]
+                      :returning [:id]}))))
+
+(deftest test-insert-with-cte
+  (is (= ["WITH defaults AS (SELECT 1) INSERT INTO users VALUES (?)" ["a"]]
+         (sql/format {:with [[:defaults {:select ["1"]}]]
+                      :insert-into :users
+                      :values [["a"]]}))))
+
+(deftest test-insert-rejects-missing-values
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :users}))))
+
+(deftest test-insert-rejects-mixed-rows
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :users
+                            :values [{:name "a"} ["b"]]}))))
+
+;; ===========================================================================
+;; UPDATE
+;; ===========================================================================
+
+(deftest test-update-basic
+  (is (= ["UPDATE users SET status = ?" ["active"]]
+         (sql/format {:update :users :set {:status "active"}}))))
+
+(deftest test-update-multiple-assignments
+  (is (= ["UPDATE users SET age = ?, name = ?" [30 "alice"]]
+         (sql/format {:update :users :set {:name "alice" :age 30}}))))
+
+(deftest test-update-with-where
+  (is (= ["UPDATE users SET status = ? WHERE id = ?" ["banned" 7]]
+         (sql/format {:update :users
+                      :set {:status "banned"}
+                      :where [:= :id 7]}))))
+
+(deftest test-update-keyword-rhs-is-identifier
+  (is (= ["UPDATE users SET copy = original" []]
+         (sql/format {:update :users :set {:copy :original}}))))
+
+(deftest test-update-rejects-empty-set
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:update :users :set {}}))))
+
+(deftest test-update-rejects-non-map-set
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:update :users :set [:status "active"]}))))
+
+;; ===========================================================================
+;; DELETE
+;; ===========================================================================
+
+(deftest test-delete-basic
+  (is (= ["DELETE FROM users" []] (sql/format {:delete-from :users}))))
+
+(deftest test-delete-with-where
+  (is (= ["DELETE FROM users WHERE id = ?" [42]]
+         (sql/format {:delete-from :users :where [:= :id 42]}))))
+
+(deftest test-delete-with-returning
+  (is (= ["DELETE FROM users WHERE id = ? RETURNING id" [42]]
+         (sql/format {:delete-from :users :where [:= :id 42] :returning [:id]}))))
+
+;; ===========================================================================
+;; Set operations (UNION / UNION ALL / INTERSECT / EXCEPT)
+;; ===========================================================================
+
+(deftest test-union
+  (is (= ["(SELECT id FROM a) UNION (SELECT id FROM b)" []]
+         (sql/format {:union [{:select [:id] :from [:a]}
+                              {:select [:id] :from [:b]}]}))))
+
+(deftest test-union-all
+  (is (= ["(SELECT id FROM a) UNION ALL (SELECT id FROM b)" []]
+         (sql/format {:union-all [{:select [:id] :from [:a]}
+                                  {:select [:id] :from [:b]}]}))))
+
+(deftest test-intersect
+  (is (= ["(SELECT id FROM a) INTERSECT (SELECT id FROM b)" []]
+         (sql/format {:intersect [{:select [:id] :from [:a]}
+                                  {:select [:id] :from [:b]}]}))))
+
+(deftest test-except
+  (is (= ["(SELECT id FROM a) EXCEPT (SELECT id FROM b)" []]
+         (sql/format {:except [{:select [:id] :from [:a]}
+                               {:select [:id] :from [:b]}]}))))
+
+(deftest test-set-op-passes-params
+  (is (= ["(SELECT id FROM a WHERE x = ?) UNION (SELECT id FROM b WHERE y = ?)" [1 2]]
+         (sql/format {:union [{:select [:id] :from [:a] :where [:= :x 1]}
+                              {:select [:id] :from [:b] :where [:= :y 2]}]}))))
+
+(deftest test-set-op-three-queries
+  (is (= ["(SELECT id FROM a) UNION (SELECT id FROM b) UNION (SELECT id FROM c)" []]
+         (sql/format {:union [{:select [:id] :from [:a]}
+                              {:select [:id] :from [:b]}
+                              {:select [:id] :from [:c]}]}))))
+
+(deftest test-set-op-rejects-singleton
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:union [{:select [:id] :from [:a]}]}))))
+
+(deftest test-set-op-rejects-extra-keys
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:union [{:select [:id] :from [:a]}
+                                    {:select [:id] :from [:b]}]
+                            :limit 10}))))
+
+;; ===========================================================================
+;; Wrong-statement-kind clause rejection
+;; ===========================================================================
+
+(deftest test-rejects-select-clauses-in-update
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:update :t :set {:a 1} :group-by [:b]}))))
+
+(deftest test-rejects-select-clauses-in-delete
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:delete-from :t :group-by [:b]}))))
+
+;; ===========================================================================
+;; Mega round-trip
+;; ===========================================================================
+
+(deftest test-everything-together
+  (is (= [(str "WITH active AS (SELECT id FROM users WHERE active = ?) "
+               "SELECT DISTINCT u.id, u.name "
+               "FROM users AS u "
+               "JOIN active AS a ON u.id = a.id "
+               "LEFT JOIN orders AS o ON u.id = o.user_id "
+               "WHERE (u.status = ?) AND (u.age >= ?) "
+               "GROUP BY u.id "
+               "HAVING COUNT(o.id) > ? "
+               "ORDER BY u.name ASC "
+               "LIMIT 10 OFFSET 20 "
+               "FOR UPDATE SKIP LOCKED")
+          [true "active" 18 5]]
+         (sql/format
+           {:with [[:active {:select [:id] :from [:users]
+                             :where [:= :active true]}]]
+            :select-distinct [:u/id :u/name]
+            :from     [[:users :u]]
+            :join     [[:active :a] [:= :u/id :a/id]]
+            :left-join [[:orders :o] [:= :u/id :o/user_id]]
+            :where    [:and [:= :u/status "active"] [:>= :u/age 18]]
+            :group-by [:u/id]
+            :having   [:> [:raw "COUNT(o.id)"] 5]
+            :order-by [[:u/name :asc]]
+            :limit    10
+            :offset   20
+            :for      [:update :skip-locked]}))))
