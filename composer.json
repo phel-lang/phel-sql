@@ -1,36 +1,25 @@
 {
-  "name": "phel-lang/cli-skeleton",
-  "description": "A minimalistic skeleton to build your cli-app using Phel Lang.",
+  "name": "phel-lang/phel-sql",
+  "description": "Data-driven SQL DSL for Phel Lang. HoneySQL-style. Pure data in, [sql params] out.",
   "keywords": [
     "phel",
     "lisp",
-    "functional",
-    "language"
+    "sql",
+    "query-builder",
+    "honeysql"
   ],
   "homepage": "https://phel-lang.org/",
   "license": "MIT",
-  "type": "project",
+  "type": "library",
   "minimum-stability": "dev",
   "prefer-stable": true,
   "require": {
     "php": ">=8.4",
-    "phel-lang/phel-lang": "dev-main",
-    "symfony/console": "^7.3"
-  },
-  "require-dev": {
-    "symfony/var-dumper": "^7.3"
-  },
-  "autoload": {
-    "psr-4": {
-      "PhelGenerated\\": "src/PhelGenerated"
-    }
+    "phel-lang/phel-lang": "^0.37"
   },
   "scripts": {
-    "dev": "vendor/bin/phel run cli-skeleton.main",
-    "build": "vendor/bin/phel build --no-cache",
-    "export": "vendor/bin/phel export",
-    "format": "vendor/bin/phel format",
     "test": "vendor/bin/phel test",
+    "format": "vendor/bin/phel format",
     "repl": [
       "Composer\\Config::disableProcessTimeout",
       "vendor/bin/phel repl"
