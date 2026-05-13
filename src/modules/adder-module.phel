@@ -1,7 +1,0 @@
-(ns cli-skeleton.modules.adder-module)
-
-(defn adder
-  "Sum every numeric argument."
-  {:export true}
-  [& numbers]
-  (apply + numbers))
