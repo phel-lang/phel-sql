@@ -1,0 +1,234 @@
+(ns phel-sql-tests\sql-test
+  (:require phel-sql\sql :as sql)
+  (:require phel.test :refer [deftest is testing]))
+
+;; ---------------------------------------------------------------------------
+;; SELECT
+;; ---------------------------------------------------------------------------
+
+(deftest test-select-single-column
+  (is (= ["SELECT id" []]
+         (sql/format {:select [:id]}))))
+
+(deftest test-select-multiple-columns
+  (is (= ["SELECT id, name, email" []]
+         (sql/format {:select [:id :name :email]}))))
+
+(deftest test-select-with-alias
+  (is (= ["SELECT id AS user_id" []]
+         (sql/format {:select [[:id :user_id]]}))))
+
+(deftest test-select-star-as-string
+  (is (= ["SELECT *" []]
+         (sql/format {:select ["*"]}))))
+
+(deftest test-select-qualified-keyword
+  (is (= ["SELECT users.id" []]
+         (sql/format {:select [:users/id]}))))
+
+;; ---------------------------------------------------------------------------
+;; FROM
+;; ---------------------------------------------------------------------------
+
+(deftest test-from-single-table
+  (is (= ["SELECT id FROM users" []]
+         (sql/format {:select [:id] :from [:users]}))))
+
+(deftest test-from-multiple-tables
+  (is (= ["SELECT id FROM users, orders" []]
+         (sql/format {:select [:id] :from [:users :orders]}))))
+
+(deftest test-from-with-alias
+  (is (= ["SELECT id FROM users AS u" []]
+         (sql/format {:select [:id] :from [[:users :u]]}))))
+
+;; ---------------------------------------------------------------------------
+;; WHERE — binary ops
+;; ---------------------------------------------------------------------------
+
+(deftest test-where-eq
+  (is (= ["SELECT id FROM users WHERE status = ?" ["active"]]
+         (sql/format {:select [:id] :from [:users] :where [:= :status "active"]}))))
+
+(deftest test-where-neq
+  (is (= ["SELECT id FROM users WHERE status != ?" ["banned"]]
+         (sql/format {:select [:id] :from [:users] :where [:!= :status "banned"]}))))
+
+(deftest test-where-lt-gt-le-ge
+  (is (= ["SELECT id FROM t WHERE n < ?" [5]]
+         (sql/format {:select [:id] :from [:t] :where [:< :n 5]})))
+  (is (= ["SELECT id FROM t WHERE n > ?" [5]]
+         (sql/format {:select [:id] :from [:t] :where [:> :n 5]})))
+  (is (= ["SELECT id FROM t WHERE n <= ?" [5]]
+         (sql/format {:select [:id] :from [:t] :where [:<= :n 5]})))
+  (is (= ["SELECT id FROM t WHERE n >= ?" [5]]
+         (sql/format {:select [:id] :from [:t] :where [:>= :n 5]}))))
+
+(deftest test-where-like
+  (is (= ["SELECT id FROM t WHERE name LIKE ?" ["A%"]]
+         (sql/format {:select [:id] :from [:t] :where [:like :name "A%"]}))))
+
+(deftest test-where-keyword-on-rhs-is-identifier
+  (is (= ["SELECT id FROM t WHERE a = b" []]
+         (sql/format {:select [:id] :from [:t] :where [:= :a :b]}))))
+
+;; ---------------------------------------------------------------------------
+;; WHERE — logical / null / set ops
+;; ---------------------------------------------------------------------------
+
+(deftest test-where-and
+  (is (= ["SELECT id FROM t WHERE (a = ?) AND (b = ?)" [1 2]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:and [:= :a 1] [:= :b 2]]}))))
+
+(deftest test-where-or
+  (is (= ["SELECT id FROM t WHERE (a = ?) OR (b = ?)" [1 2]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:or [:= :a 1] [:= :b 2]]}))))
+
+(deftest test-where-not
+  (is (= ["SELECT id FROM t WHERE NOT (a = ?)" [1]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:not [:= :a 1]]}))))
+
+(deftest test-where-nested-and-or
+  (is (= ["SELECT id FROM t WHERE (a = ?) AND ((b = ?) OR (c = ?))" [1 2 3]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:and [:= :a 1]
+                              [:or [:= :b 2] [:= :c 3]]]}))))
+
+(deftest test-where-in
+  (is (= ["SELECT id FROM t WHERE id IN (?, ?, ?)" [1 2 3]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:in :id [1 2 3]]}))))
+
+(deftest test-where-between
+  (is (= ["SELECT id FROM t WHERE n BETWEEN ? AND ?" [1 10]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:between :n 1 10]}))))
+
+(deftest test-where-is-null
+  (is (= ["SELECT id FROM t WHERE deleted_at IS NULL" []]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:is-null :deleted_at]}))))
+
+(deftest test-where-is-not-null
+  (is (= ["SELECT id FROM t WHERE deleted_at IS NOT NULL" []]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:is-not-null :deleted_at]}))))
+
+;; ---------------------------------------------------------------------------
+;; ORDER BY
+;; ---------------------------------------------------------------------------
+
+(deftest test-order-by-bare
+  (is (= ["SELECT id FROM t ORDER BY id" []]
+         (sql/format {:select [:id] :from [:t] :order-by [:id]}))))
+
+(deftest test-order-by-asc
+  (is (= ["SELECT id FROM t ORDER BY id ASC" []]
+         (sql/format {:select [:id] :from [:t] :order-by [[:id :asc]]}))))
+
+(deftest test-order-by-desc
+  (is (= ["SELECT id FROM t ORDER BY id DESC" []]
+         (sql/format {:select [:id] :from [:t] :order-by [[:id :desc]]}))))
+
+(deftest test-order-by-mixed
+  (is (= ["SELECT id FROM t ORDER BY a ASC, b DESC, c" []]
+         (sql/format {:select [:id] :from [:t]
+                      :order-by [[:a :asc] [:b :desc] :c]}))))
+
+;; ---------------------------------------------------------------------------
+;; LIMIT / OFFSET
+;; ---------------------------------------------------------------------------
+
+(deftest test-limit
+  (is (= ["SELECT id FROM t LIMIT 10" []]
+         (sql/format {:select [:id] :from [:t] :limit 10}))))
+
+(deftest test-offset
+  (is (= ["SELECT id FROM t OFFSET 20" []]
+         (sql/format {:select [:id] :from [:t] :offset 20}))))
+
+(deftest test-limit-and-offset
+  (is (= ["SELECT id FROM t LIMIT 10 OFFSET 20" []]
+         (sql/format {:select [:id] :from [:t] :limit 10 :offset 20}))))
+
+(deftest test-limit-zero
+  (is (= ["SELECT id FROM t LIMIT 0" []]
+         (sql/format {:select [:id] :from [:t] :limit 0}))))
+
+;; ---------------------------------------------------------------------------
+;; Combined round-trip
+;; ---------------------------------------------------------------------------
+
+(deftest test-full-query
+  (is (= ["SELECT id, name FROM users WHERE (status = ?) AND (age >= ?) ORDER BY name ASC LIMIT 10 OFFSET 20"
+          ["active" 18]]
+         (sql/format {:select   [:id :name]
+                      :from     [:users]
+                      :where    [:and [:= :status "active"] [:>= :age 18]]
+                      :order-by [[:name :asc]]
+                      :limit    10
+                      :offset   20}))))
+
+;; ---------------------------------------------------------------------------
+;; Edge cases
+;; ---------------------------------------------------------------------------
+
+(deftest test-empty-query
+  (is (= ["" []] (sql/format {}))))
+
+(deftest test-clause-order-is-fixed
+  (testing "input map key order does not affect emission"
+    (is (= (sql/format {:select [:id] :from [:t] :where [:= :a 1] :limit 5})
+           (sql/format {:limit 5 :where [:= :a 1] :from [:t] :select [:id]})))))
+
+;; ---------------------------------------------------------------------------
+;; Error paths
+;; ---------------------------------------------------------------------------
+
+(deftest test-rejects-non-map-input
+  (is (thrown? \InvalidArgumentException (sql/format [:select [:id]]))))
+
+(deftest test-rejects-unknown-clause
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :group-by [:dept]}))))
+
+(deftest test-rejects-unknown-where-operator
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t]
+                            :where [:wat :a 1]}))))
+
+(deftest test-rejects-non-vector-where
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where "broken"}))))
+
+(deftest test-rejects-empty-in-list
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where [:in :id []]}))))
+
+(deftest test-rejects-bad-order-direction
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t]
+                            :order-by [[:id :sideways]]}))))
+
+(deftest test-rejects-negative-limit
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :limit -1}))))
+
+(deftest test-rejects-non-int-limit
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :limit "10"}))))
+
+(deftest test-rejects-negative-offset
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :offset -1}))))
+
+(deftest test-rejects-unsupported-identifier
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [42]}))))
+
+(deftest test-rejects-empty-and
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where [:and]}))))
