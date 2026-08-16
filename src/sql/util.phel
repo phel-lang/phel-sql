@@ -1,7 +1,7 @@
 (in-ns phel.sql)
 
 (defn- bad-arg [msg]
-  (throw (php/new \InvalidArgumentException msg)))
+  (throw (\InvalidArgumentException. msg)))
 
 (defn- show [x] (php/var_export x true))
 

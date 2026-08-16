@@ -54,10 +54,10 @@
 (defn- emit-for [spec]
   (let [[mode lock] (if (vector? spec) spec [spec nil])
         mode-sql    (or (get for-modes mode)
-                     (bad-arg (str "for mode must be one of "
-                                   (str/join ", " (map name (keys for-modes)))
-                                   ", got: " (show mode))))
+                        (bad-arg (str "for mode must be one of "
+                                      (str/join ", " (map name (keys for-modes)))
+                                      ", got: " (show mode))))
         lock-sql    (when lock
-                   (or (get for-locks lock)
-                       (bad-arg (str "for lock must be :nowait or :skip-locked, got: " (show lock)))))]
+                      (or (get for-locks lock)
+                          (bad-arg (str "for lock must be :nowait or :skip-locked, got: " (show lock)))))]
     [(if lock-sql (str "FOR " mode-sql " " lock-sql) (str "FOR " mode-sql)) []]))
