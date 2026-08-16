@@ -124,30 +124,30 @@
     (bad-arg ":on-conflict and :on-duplicate-key-update are mutually exclusive"))
   (let [vs                (normalise-values (get query :values))
         columns-sql       (cond
-                      (contains? query :columns) (first (emit-columns (get query :columns)))
-                      :else                      (get vs :columns-sql))
+                            (contains? query :columns) (first (emit-columns (get query :columns)))
+                            :else                      (get vs :columns-sql))
         head              (cond-> []
-                     (contains? query :with)           (conj (emit-with           (get query :with)))
-                     (contains? query :with-recursive) (conj (emit-with-recursive (get query :with-recursive))))
+                                  (contains? query :with)           (conj (emit-with           (get query :with)))
+                                  (contains? query :with-recursive) (conj (emit-with-recursive (get query :with-recursive))))
         body              [(emit-insert-into (get query :insert-into))]
         conflict          (emit-on-conflict-block query)
         odku              (when (contains? query :on-duplicate-key-update)
-               (emit-on-duplicate-key-update (get query :on-duplicate-key-update)))
+                            (emit-on-duplicate-key-update (get query :on-duplicate-key-update)))
         tail              (cond-> []
-                     conflict (conj conflict)
-                     odku     (conj odku)
-                     (contains? query :returning) (conj (emit-returning (get query :returning))))
+                                  conflict (conj conflict)
+                                  odku     (conj odku)
+                                  (contains? query :returning) (conj (emit-returning (get query :returning))))
         leading-fragments (concat head body)
         leading-sql       (str/join " " (sqls-of leading-fragments))
         leading-params    (vec (params-of leading-fragments))
         tail-sql          (str/join " " (sqls-of tail))
         tail-params       (vec (params-of tail))
         all-sql           (str/join " "
-                          (filter (fn [s] (not (empty? s)))
-                                  [leading-sql
-                                   columns-sql
-                                   (get vs :values-sql)
-                                   tail-sql]))]
+                                    (filter (fn [s] (not (empty? s)))
+                                            [leading-sql
+                                             columns-sql
+                                             (get vs :values-sql)
+                                             tail-sql]))]
     [all-sql (vec (concat leading-params (get vs :params) tail-params))]))
 
 (defn- emit-values-stmt [query]

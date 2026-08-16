@@ -20,7 +20,7 @@
     (let [target                     (get query :on-conflict)
           [target-sql target-params] (emit-on-conflict-target target)
           where-sql                  (when (contains? query :on-conflict-where)
-                      (emit-where (get query :on-conflict-where)))
+                                       (emit-where (get query :on-conflict-where)))
           do-nothing?                (get query :do-nothing)
           do-update                  (get query :do-update-set)
           do-update-where            (get query :do-update-where)]
@@ -29,7 +29,7 @@
       (when (and (contains? query :on-conflict-where) (not (contains? query :on-conflict)))
         (bad-arg ":on-conflict-where requires :on-conflict"))
       (let [head        (str "ON CONFLICT" target-sql
-                      (when where-sql (str " WHERE " (first where-sql))))
+                             (when where-sql (str " WHERE " (first where-sql))))
             head-params (concat target-params (if where-sql (second where-sql) []))]
         (cond
           do-nothing?
