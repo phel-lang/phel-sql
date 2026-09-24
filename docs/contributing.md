@@ -19,7 +19,7 @@ composer install
 composer test
 ```
 
-CI runs the same on PHP 8.4 and 8.5.
+CI runs the same on PHP 8.5.
 
 ## REPL
 
