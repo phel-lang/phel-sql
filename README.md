@@ -18,7 +18,7 @@ Inspired by [HoneySQL](https://github.com/seancorfield/honeysql).
 composer require phel-lang/phel-sql
 ```
 
-Requires PHP 8.4+ and `phel-lang/phel-lang` 0.37+.
+Requires PHP 8.5+ and `phel-lang/phel-lang` 0.53+.
 
 ## Use it
 
