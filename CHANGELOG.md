@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-04
+
 ### Changed
 
 - Require phel-lang ^0.54.
@@ -26,5 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed namespace `phel-sql.sql` → `phel.sql`.
 - Retargeted package as `phel-sql` library; trimmed CI workflow and removed CLI/Docker scaffolding.
 
-[Unreleased]: https://github.com/phel-lang/phel-sql/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/phel-lang/phel-sql/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/phel-lang/phel-sql/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/phel-lang/phel-sql/releases/tag/v0.1.0
