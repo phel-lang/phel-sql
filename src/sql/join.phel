@@ -12,10 +12,10 @@
     :else
     (prefixed "ON" (emit-where on))))
 
-(defn- emit-join-list [kw pairs]
-  (when-not (and (vector? pairs) (pos? (count pairs)) (even? (count pairs)))
+(defn- emit-join-list [kw clauses]
+  (when-not (and (vector? clauses) (pos? (count clauses)) (even? (count clauses)))
     (bad-arg (str kw " expects a vector of [table on-clause] pairs")))
-  (let [compiled (->> pairs
+  (let [compiled (->> clauses
                       (partition 2)
                       (map (fn [[table on]]
                              (let [[t-sql t-params] (ident+ table)
@@ -31,7 +31,7 @@
         sqls  (map (fn [[s _]] (str "CROSS JOIN " s)) parts)]
     [(str/join " " sqls) (params-of parts)]))
 
-(defn- emit-join       [pairs] (emit-join-list "JOIN"       pairs))
-(defn- emit-left-join  [pairs] (emit-join-list "LEFT JOIN"  pairs))
-(defn- emit-right-join [pairs] (emit-join-list "RIGHT JOIN" pairs))
-(defn- emit-full-join  [pairs] (emit-join-list "FULL JOIN"  pairs))
+(defn- emit-join       [clauses] (emit-join-list "JOIN"       clauses))
+(defn- emit-left-join  [clauses] (emit-join-list "LEFT JOIN"  clauses))
+(defn- emit-right-join [clauses] (emit-join-list "RIGHT JOIN" clauses))
+(defn- emit-full-join  [clauses] (emit-join-list "FULL JOIN"  clauses))

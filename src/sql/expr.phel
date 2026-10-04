@@ -23,34 +23,34 @@
 
 (defn- split-case-args
   "Walk case args, collecting [test then] pairs until we hit :else, then take
-   the final default. Returns [pairs default-or-nil]."
+   the final default. Returns [case-pairs default-or-nil]."
   [args]
-  (loop [remaining args
-         pairs     []
-         default   nil]
+  (loop [remaining  args
+         case-pairs []
+         default    nil]
     (cond
-      (empty? remaining)          [pairs default]
+      (empty? remaining)          [case-pairs default]
 
       (= (first remaining) :else)
       (do
         (when (not= (count remaining) 2)
           (bad-arg "case :else must be followed by exactly one default value at the end"))
-        [pairs (second remaining)])
+        [case-pairs (second remaining)])
 
       (< (count remaining) 2)
       (bad-arg "case expects pairs of [test then]")
 
       :else
       (recur (drop 2 remaining)
-             (conj pairs [(first remaining) (second remaining)])
+             (conj case-pairs [(first remaining) (second remaining)])
              default))))
 
 (defn- emit-case [[_ & args]]
-  (let [[pairs default] (split-case-args args)]
-    (when (zero? (count pairs))
+  (let [[case-pairs default] (split-case-args args)]
+    (when (zero? (count case-pairs))
       (bad-arg "case requires at least one [test then] pair"))
     (let [pair-fragments
-          (for [[test then] :in pairs]
+          (for [[test then] :in case-pairs]
             (let [[t-sql t-p] (emit-where test)
                   [v-sql v-p] (operand then)]
               [(str "WHEN " t-sql " THEN " v-sql)
