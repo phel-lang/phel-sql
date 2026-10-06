@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Forward declarations name only the function. The next phel-lang release rejects `(declare f [x])`, which used to drop the vector.
+
 ## [0.2.0] - 2026-10-04
 
 ### Changed
