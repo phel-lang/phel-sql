@@ -6,14 +6,14 @@
 ;; defined. Same-namespace, multi-file pattern mirrors phel.core's split.
 ;; ===========================================================================
 
-(declare emit-where [clause])
-(declare compile-query [query])
-(declare operand [x])
-(declare ident+ [x])
-(declare ident [x])
-(declare emit-tagged [x])
-(declare emit-set [m])
-(declare emit-order-fragments [items])
+(declare emit-where)
+(declare compile-query)
+(declare operand)
+(declare ident+)
+(declare ident)
+(declare emit-tagged)
+(declare emit-set)
+(declare emit-order-fragments)
 
 ;; ===========================================================================
 ;; Load sub-files (each starts with `(in-ns phel.sql)`).
