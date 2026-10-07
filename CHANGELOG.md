@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-07
+
 ### Fixed
 
 - Forward declarations name only the function. The next phel-lang release rejects `(declare f [x])`, which used to drop the vector.
@@ -32,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed namespace `phel-sql.sql` → `phel.sql`.
 - Retargeted package as `phel-sql` library; trimmed CI workflow and removed CLI/Docker scaffolding.
 
-[Unreleased]: https://github.com/phel-lang/phel-sql/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/phel-lang/phel-sql/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/phel-lang/phel-sql/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/phel-lang/phel-sql/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/phel-lang/phel-sql/releases/tag/v0.1.0
