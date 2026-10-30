@@ -149,10 +149,14 @@
    keyword     -> identifier
    tagged form -> dispatched
    subquery    -> '(...)'
+   vector      -> error (untagged vectors cannot be bound)
    anything    -> '?' (bound)."
   [x]
   (cond
     (keyword? x)  [(ident x) []]
     (tagged? x)   (emit-tagged x)
     (subquery? x) (let [[s p] (compile-query x)] [(str "(" s ")") p])
+    (vector? x)   (bad-arg (if (keyword? (first x))
+                             (str "Unknown expression tag: " (show (first x)))
+                             (str "Unsupported operand, use [:raw ...] or :in for lists: " (show x))))
     :else         ["?" [x]]))

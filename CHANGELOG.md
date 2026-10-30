@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WHERE operators throw when given the wrong number of arguments instead of binding `nil` or dropping extras (#11)
 - Clauses that list columns or tables throw a clear error for empty or non-vector values instead of emitting invalid SQL or leaking a Phel runtime message (#12)
 - UPDATE without `:set` throws instead of compiling to invalid SQL (#13)
+- Untagged vectors in value positions throw instead of being bound as one parameter, so a mistyped tag like `[:fnn ...]` is reported (#14)
 
 ## [0.2.1] - 2026-10-07
 
