@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Docs list every identifier position that renders a string verbatim, including `:set` keys, function names, cast types and aliases (#17)
 - The README links to the list of identifier positions that render a string verbatim (#17)
+- Keyword identifiers are validated: only letters, digits, `_`, `$`, dots between parts and a bare `*` are accepted, so `(keyword user-input)` cannot inject SQL. Use a string or `[:raw ...]` for other names (#18)
 
 ## [0.2.1] - 2026-10-07
 

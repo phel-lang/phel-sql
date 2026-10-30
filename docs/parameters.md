@@ -31,6 +31,8 @@ The split matters when the same form could mean two things. Values in `:where` a
 :user_id     ; -> user_id
 ```
 
+A keyword may contain only letters, digits, `_` and `$`, plus `.` between parts and a bare `*`. Anything else throws `InvalidArgumentException`, so `(keyword user-input)` cannot smuggle SQL into a query. Use a string or `[:raw "..."]` for other names.
+
 ### Qualified keyword (schema / table prefix)
 
 ```phel

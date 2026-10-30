@@ -175,3 +175,19 @@
   (is (thrown? \InvalidArgumentException
                (sql/format {:select [[:over [:fn :sum :x] {:frame [:rows [:preceding -1]]}]]
                             :from [:t]}))))
+
+(deftest test-rejects-keyword-identifier-with-statement-break
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [(keyword "id; DROP TABLE t --")] :from [:t]}))))
+
+(deftest test-rejects-keyword-identifier-with-space
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [(keyword "a b")] :from [:t]}))))
+
+(deftest test-rejects-keyword-identifier-with-paren
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where [:= (keyword "a)") 1]}))))
+
+(deftest test-rejects-keyword-namespace-with-injection
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [(keyword "t; --" "id")] :from [:t]}))))
