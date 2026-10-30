@@ -2,7 +2,7 @@
 description: Format, test, and commit with a conventional commit message
 argument-hint: "[optional commit message]"
 disable-model-invocation: true
-allowed-tools: "Read, Edit, Bash(composer *), Bash(./vendor/bin/phel *), Bash(vendor/bin/phel *), Bash(git *)"
+allowed-tools: "read, edit, shell(composer *), shell(./vendor/bin/phel *), shell(vendor/bin/phel *), shell(git *)"
 ---
 
 # Commit

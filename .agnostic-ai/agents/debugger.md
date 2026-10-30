@@ -1,7 +1,7 @@
 ---
 name: debugger
 description: Diagnoses wrong SQL output, missing params, or emitter errors in the phel-sql pipeline.
-model: sonnet
+model: {claude: sonnet}
 maxTurns: 20
 allowed_tools:
   - Read

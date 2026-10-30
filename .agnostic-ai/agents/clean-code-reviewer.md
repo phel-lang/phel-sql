@@ -1,7 +1,7 @@
 ---
 name: clean-code-reviewer
 description: Reviews Phel changes against project standards. Use for PR review, staged changes, or focused file audits.
-model: sonnet
+model: {claude: sonnet}
 memory: project
 allowed_tools:
   - Read

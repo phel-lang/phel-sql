@@ -1,0 +1,8 @@
+{
+    "$schema": "https://json.schemastore.org/claude-code-settings.json",
+    "includeCoAuthoredBy": false,
+    "statusLine": {
+        "type": "command",
+        "command": "/bin/bash .claude/statusline.sh"
+    }
+}

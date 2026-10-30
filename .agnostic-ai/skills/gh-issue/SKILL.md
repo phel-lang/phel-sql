@@ -74,7 +74,7 @@ Read both the issue body **and every comment** as requirements input. Maintainer
     - duplication (extract or reuse);
     - dead branches, unused locals;
     - naming drift vs. surrounding sub-file;
-    - violations of `.claude/rules/phel.md`, `sql-dsl.md`;
+    - violations of `.agnostic-ai/rules/phel.md`, `sql-dsl.md`;
     - speculative abstractions.
 
     Apply, re-run `composer test`, commit as a separate `ref(<scope>):` — must be the final commit on the branch:

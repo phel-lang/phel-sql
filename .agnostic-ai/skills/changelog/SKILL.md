@@ -2,7 +2,7 @@
 description: Update CHANGELOG.md Unreleased section from recent commits or manual entry
 argument-hint: "[entry text]"
 disable-model-invocation: true
-allowed-tools: "Read, Edit, Bash(git *)"
+allowed-tools: "read, edit, shell(git *)"
 ---
 
 # Update Changelog

@@ -1,7 +1,7 @@
 ---
 name: tdd-coach
 description: Guides strict red-green-refactor TDD for new clauses, operators, or expression forms.
-model: sonnet
+model: {claude: sonnet}
 maxTurns: 25
 allowed_tools:
   - Read
