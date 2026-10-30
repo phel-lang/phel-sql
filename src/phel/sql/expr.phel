@@ -108,7 +108,7 @@
                 (reset! params (concat (deref params) p)))]
     (when (contains? m :partition-by)
       (let [cols  (get m :partition-by)
-            parts (map ident+ cols)]
+            parts (map ident+ (non-empty-vector! :partition-by cols))]
         (push! (str "PARTITION BY " (str/join ", " (sqls-of parts)))
                (params-of parts))))
     (when (contains? m :order-by)

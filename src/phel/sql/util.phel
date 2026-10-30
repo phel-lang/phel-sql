@@ -10,3 +10,8 @@
 
 (defn- prefixed [prefix [sql params]]
   [(str prefix " " sql) params])
+
+(defn- non-empty-vector! [clause v]
+  (when-not (and (vector? v) (seq v))
+    (bad-arg (str clause " expects a non-empty vector, got: " (show v))))
+  v)

@@ -17,7 +17,7 @@
     [(str "SET " (str/join ", " (sqls-of parts))) (params-of parts)]))
 
 (defn- emit-columns [cols]
-  [(str "(" (str/join ", " (map ident cols)) ")") []])
+  [(str "(" (str/join ", " (map ident (non-empty-vector! :columns cols))) ")") []])
 
 (defn- row-placeholders [row]
   (str "(" (str/join ", " (map (fn [_] "?") row)) ")"))

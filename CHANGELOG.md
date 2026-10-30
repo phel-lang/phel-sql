@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - INSERT rejects empty rows, ragged vector rows and rows whose width differs from `:columns` (#9)
 - INSERT rejects upsert keys that have no `:on-conflict`, and `:do-update-where` without `:do-update-set`, instead of dropping them (#10)
 - WHERE operators throw when given the wrong number of arguments instead of binding `nil` or dropping extras (#11)
+- Clauses that list columns or tables throw a clear error for empty or non-vector values instead of emitting invalid SQL or leaking a Phel runtime message (#12)
 
 ## [0.2.1] - 2026-10-07
 

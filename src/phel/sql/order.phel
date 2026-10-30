@@ -22,7 +22,7 @@
     :else                                           (bad-arg (str "Unsupported order-by item: " (show item)))))
 
 (defn- emit-order-fragments [items]
-  (let [parts (map emit-order-item items)]
+  (let [parts (map emit-order-item (non-empty-vector! :order-by items))]
     [(str/join ", " (sqls-of parts)) (params-of parts)]))
 
 (defn- emit-order-by [items]
