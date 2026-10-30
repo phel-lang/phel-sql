@@ -88,6 +88,8 @@ Set / range / null: `:in`, `:not-in`, `:between`, `:not-between`, `:is-null`, `:
 
 Subquery presence: `:exists`, `:not-exists`.
 
+Argument counts are checked. Binary operators, `:in` and `:not-in` take 2 arguments; `:between` and `:not-between` take 3; `:is-null`, `:is-not-null`, `:not`, `:exists` and `:not-exists` take 1; `:and` and `:or` take at least 1. Any other count throws.
+
 ```phel
 [:= :status "active"]
 [:= :a :b]
@@ -292,7 +294,7 @@ Every malformed input raises `InvalidArgumentException`. Highlights:
 - non-map input
 - unknown clause for the detected statement kind
 - two of `:select` / `:select-distinct` / `:select-distinct-on` together
-- unknown WHERE operator or non-vector WHERE body
+- unknown WHERE operator, wrong argument count, or non-vector WHERE body
 - empty `:in` list (without subquery)
 - bad order direction / nulls modifier
 - negative or non-integer `:limit` / `:offset`

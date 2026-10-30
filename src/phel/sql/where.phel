@@ -68,10 +68,24 @@
           kw    (if negate? "NOT EXISTS" "EXISTS")]
       [(str kw " (" s ")") p])))
 
+(def- special-op-arity
+  {:in 2 :not-in 2
+   :between 3 :not-between 3
+   :is-null 1 :is-not-null 1
+   :not 1
+   :exists 1 :not-exists 1})
+
+(defn- check-arity! [op args]
+  (let [expected (if (contains? binary-ops op) 2 (get special-op-arity op))]
+    (when (and expected (not= expected (count args)))
+      (bad-arg (str "where operator " (show op) " expects " expected
+                    " argument(s), got: " (count args))))))
+
 (defn- emit-where [clause]
   (when-not (vector? clause)
     (bad-arg (str "where clause must be a vector, got: " (show clause))))
   (let [[op & args] clause]
+    (check-arity! op args)
     (case op
       :and         (emit-logical "AND" args)
       :or          (emit-logical "OR" args)
