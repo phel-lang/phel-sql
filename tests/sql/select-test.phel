@@ -33,3 +33,7 @@
   (testing "input map key order does not affect emission"
            (is (= (sql/format {:select [:id] :from [:t] :where [:= :a 1] :limit 5})
                   (sql/format {:limit 5 :where [:= :a 1] :from [:t] :select [:id]})))))
+
+(deftest test-select-accepts-common-identifier-shapes
+  (is (= ["SELECT id, user_id, users.id, t.col, t.*, *, _x1, $1 FROM t" []]
+         (sql/format {:select [:id :user_id :users/id :t.col :t.* :* :_x1 :$1] :from [:t]}))))

@@ -6,15 +6,24 @@
 (defn- tagged? [x] (and (vector? x) (keyword? (first x)) (contains? expr-tags (first x))))
 (defn- raw? [x] (and (vector? x) (= :raw (first x)) (= 2 (count x))))
 
+(def- identifier-segment-pattern "/^(?:[A-Za-z_$][A-Za-z0-9_$]*|[0-9]+|\\*)$/")
+
+(defn- check-identifier-segments! [kw text]
+  (when-not (every? (fn [segment] (= 1 (php/preg_match identifier-segment-pattern segment)))
+                    (str/split text #"\."))
+    (bad-arg (str "Invalid identifier: " (show kw)
+                  ". Use a string or [:raw ...] for names outside letters, digits, _ and $"))))
+
 (defn- ident
   "Render a plain identifier (no params, no subquery).
     keyword         -> bare name (qualified -> 'schema.name')
     string          -> literal escape hatch"
   [x]
   (cond
-    (keyword? x) (if-let [ns (namespace x)]
-                   (str ns "." (name x))
-                   (name x))
+    (keyword? x) (let [ns (namespace x)]
+                   (when ns (check-identifier-segments! x ns))
+                   (check-identifier-segments! x (name x))
+                   (if ns (str ns "." (name x)) (name x)))
     (string? x)  x
     :else        (bad-arg (str "Unsupported identifier: " (show x)))))
 
