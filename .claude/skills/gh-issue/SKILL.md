@@ -40,7 +40,7 @@ Read both the issue body **and every comment** as requirements input. Maintainer
 
 4. **Enter Plan Mode**:
    - Identify whether this touches a clause, operator, tagged form, error, or docs.
-   - List files to touch (`src/sql/<file>.phel`, `src/sql.phel` if a new cross-file decl is needed, `tests/sql/<topic>-test.phel`, docs).
+   - List files to touch (`src/phel/sql/<file>.phel`, `src/phel/sql.phel` if a new cross-file decl is needed, `tests/sql/<topic>-test.phel`, docs).
    - Plan tests first.
 
 5. **Create plan** with: summary, files to touch, test list (one per shape + one per error), implementation order.

@@ -3,7 +3,7 @@
 ## Layout
 
 ```
-src/sql.phel             ; public API: sql/format + private emitters
+src/phel/sql.phel             ; public API: sql/format + private emitters
 tests/sql-test.phel      ; one deftest per clause and per error path
 docs/                    ; this directory
 phel-config.php          ; flat layout, library
@@ -57,7 +57,7 @@ Subqueries work because `compile-query` is called recursively from `ident+`, `op
 
 ## Add a new clause to SELECT
 
-1. Write a private emitter in `src/sql.phel`:
+1. Write a private emitter in `src/phel/sql.phel`:
 
    ```phel
    (defn- emit-window [windows]

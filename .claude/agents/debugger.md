@@ -20,16 +20,16 @@ Diagnose wrong SQL output, dropped params, or unexpected errors in the phel-sql 
 
 | Symptom | Layer | Where to look |
 |---------|-------|---------------|
-| Wrong identifier rendering (`users.id` vs `users/id`) | Expressions | `src/sql/ident.phel` |
-| Wrong value placeholder / missing param | Expressions | `src/sql/expr.phel`, `operand` in `src/sql.phel` |
-| Wrong WHERE shape | WHERE engine | `src/sql/where.phel`, `binary-ops`, `emit-where` |
-| Wrong clause order or missing clause | Dispatch | `src/sql/dispatch.phel` (`*-emitters` + `*-order`) |
-| Wrong JOIN syntax | Join emitter | `src/sql/join.phel` |
-| Wrong CTE / `WITH` | CTE | `src/sql/cte.phel` |
-| Wrong INSERT/UPDATE/DELETE | DML | `src/sql/dml.phel`, `src/sql/upsert.phel` |
-| Wrong CASE / OVER / FILTER / LATERAL / CAST / FN | Tagged forms | `emit-tagged` + `expr-tags` in `src/sql/expr.phel` |
+| Wrong identifier rendering (`users.id` vs `users/id`) | Expressions | `src/phel/sql/ident.phel` |
+| Wrong value placeholder / missing param | Expressions | `src/phel/sql/expr.phel`, `operand` in `src/phel/sql.phel` |
+| Wrong WHERE shape | WHERE engine | `src/phel/sql/where.phel`, `binary-ops`, `emit-where` |
+| Wrong clause order or missing clause | Dispatch | `src/phel/sql/dispatch.phel` (`*-emitters` + `*-order`) |
+| Wrong JOIN syntax | Join emitter | `src/phel/sql/join.phel` |
+| Wrong CTE / `WITH` | CTE | `src/phel/sql/cte.phel` |
+| Wrong INSERT/UPDATE/DELETE | DML | `src/phel/sql/dml.phel`, `src/phel/sql/upsert.phel` |
+| Wrong CASE / OVER / FILTER / LATERAL / CAST / FN | Tagged forms | `emit-tagged` + `expr-tags` in `src/phel/sql/expr.phel` |
 | Subquery params lost | Recursion | `ident+`, `operand`, `compile-query` boundaries |
-| `Cannot resolve symbol` at load time | Forward decl | `(declare ...)` block in `src/sql.phel` |
+| `Cannot resolve symbol` at load time | Forward decl | `(declare ...)` block in `src/phel/sql.phel` |
 
 ## Steps
 
