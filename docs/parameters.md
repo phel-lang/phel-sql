@@ -20,7 +20,7 @@ The compiler has a small classification:
 | other vector        | error                    | error (cannot be bound)     |
 | anything else       | error                    | parameter `?`               |
 
-The split matters when the same form could mean two things. Inside `:where` and `:set`, strings are values (bound as `?`). Inside `:select` and `:from`, strings are raw identifiers. To use a raw expression in `:where`, wrap it with `[:raw "..."]` (or use one of the higher-level tagged forms).
+The split matters when the same form could mean two things. Values in `:where` and `:set` are bound as `?`, so a string there is a parameter. Every identifier position renders a string verbatim (see [Raw string](#raw-string)); that includes the keys of a `:set` map. To use a raw expression in `:where`, wrap it with `[:raw "..."]` (or use one of the higher-level tagged forms).
 
 ## Identifiers
 
@@ -52,12 +52,30 @@ The keyword's namespace becomes the prefix.
 
 ### Raw string
 
-In `:select`, `:from`, `:group-by`, `:returning`, `:columns`, a bare string is rendered verbatim. Same effect as `[:raw "..."]` but only works in identifier positions.
+A string in any identifier position is rendered verbatim, with no escaping or validation. It has the same effect as `[:raw "..."]`.
 
 ```phel
 {:select ["*"]}                       ; SELECT *
 {:select ["COUNT(*) AS total"]}       ; SELECT COUNT(*) AS total
 ```
+
+Identifier positions that take a verbatim string:
+
+| Position                                             | Example                                   |
+|------------------------------------------------------|-------------------------------------------|
+| `:select`, `:select-distinct`, `:select-distinct-on` | `{:select ["*"]}`                         |
+| `:from`, `:update`, `:delete-from`, `:insert-into`   | `{:from ["users u"]}`                     |
+| join tables and `[:using ...]` columns               | `{:join ["orders o" [:= :o.user_id :u.id]]}` |
+| `:group-by`, `:returning`, `:columns`                | `{:columns ["a" "b"]}`                    |
+| `:order-by` and `:partition-by` columns              | `{:order-by ["created_at"]}`              |
+| alias name in `[base alias]`                         | `[:id "user_id"]`                         |
+| `:set` and `:on-duplicate-key-update` map keys       | `{:set {"count" 1}}` (the value is bound) |
+| `:with` and `:with-recursive` names                  | `{:with [["recent" {:select [:1]}]]}`     |
+| `:on-conflict {:on-constraint ...}`                  | `{:on-constraint "users_pkey"}`           |
+| `[:fn name ...]` function name                       | `[:fn "date_trunc" "day" :ts]`            |
+| `[:cast expr type]` type                             | `[:cast :x "numeric(10, 2)"]`             |
+
+Never build one of these strings from user input. `[:raw ...]` carries the same warning, see [Raw SQL escape hatch](#raw-sql-escape-hatch).
 
 ## Placeholders
 
