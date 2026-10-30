@@ -1,0 +1,6 @@
+command: .claude/hooks/format-phel.sh
+description: Runs `.claude/hooks/format-phel.sh` on PostToolUse for Edit|Write.
+event: PostToolUse
+matcher: Edit|Write
+name: posttooluse-edit-write-format-phel
+timeout: 30

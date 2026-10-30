@@ -1,0 +1,23 @@
+permissions:
+    allow:
+        - shell(composer *)
+        - shell(./vendor/bin/phel *)
+        - shell(vendor/bin/phel *)
+        - shell(./release.sh *)
+        - shell(git *)
+        - shell(gh *)
+        - shell(ls *)
+        - shell(wc *)
+        - shell(timeout *)
+        - shell(rm -rf .phel)
+        - shell(rm -rf .phel/*)
+    deny:
+        - shell(rm -rf /:*)
+        - shell(rm -rf ~*)
+        - shell(rm -rf $HOME*)
+        - shell(rm -rf ..*)
+        - shell(rm -fr /:*)
+        - shell(sudo:*)
+        - shell(shutdown:*)
+        - shell(reboot:*)
+        - shell(mkfs:*)

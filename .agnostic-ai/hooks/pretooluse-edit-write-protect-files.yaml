@@ -1,0 +1,6 @@
+command: .claude/hooks/protect-files.sh
+description: Runs `.claude/hooks/protect-files.sh` on PreToolUse for Edit|Write.
+event: PreToolUse
+matcher: Edit|Write
+name: pretooluse-edit-write-protect-files
+timeout: 5

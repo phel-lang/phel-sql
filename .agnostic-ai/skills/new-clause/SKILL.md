@@ -2,7 +2,7 @@
 description: Scaffold a new SELECT clause, WHERE operator, or tagged expression form end-to-end
 argument-hint: "[clause|where-op|tagged] [name]"
 disable-model-invocation: true
-allowed-tools: "Read, Write, Edit, Glob, Grep, Bash(composer *), Bash(./vendor/bin/phel *), Bash(vendor/bin/phel *)"
+allowed-tools: "read, write, edit, Glob, Grep, shell(composer *), shell(./vendor/bin/phel *), shell(vendor/bin/phel *)"
 ---
 
 # New Clause / Operator / Tagged Form

@@ -1,0 +1,8 @@
+{
+  "after": "includeCoAuthoredBy",
+  "events": [
+    "PostToolUse",
+    "PreToolUse",
+    "SessionStart"
+  ]
+}
