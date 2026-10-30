@@ -56,3 +56,32 @@
   (is (thrown? \InvalidArgumentException
                (sql/format {:insert-into :t :values [[1]] :on-conflict [:id]
                             :do-nothing true :do-update-where [:= :a 1]}))))
+
+(deftest test-rejects-binary-op-with-one-arg
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where [:= :a]}))))
+
+(deftest test-rejects-binary-op-with-three-args
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where [:= :a 1 2]}))))
+
+(deftest test-rejects-in-with-one-arg
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where [:in :a]}))))
+
+(deftest test-rejects-between-with-two-args
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where [:between :a 1]}))))
+
+(deftest test-rejects-is-null-without-arg
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where [:is-null]}))))
+
+(deftest test-rejects-not-with-two-clauses
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where [:not [:= :a 1] [:= :b 2]]}))))
+
+(deftest test-rejects-exists-with-two-subqueries
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t]
+                            :where [:exists {:select [:1]} {:select [:2]}]}))))
