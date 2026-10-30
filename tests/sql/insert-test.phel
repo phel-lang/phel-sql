@@ -49,3 +49,7 @@
 (deftest test-insert-map-rows-reject-key-outside-columns
   (is (thrown? \InvalidArgumentException
                (sql/format {:insert-into :t :columns [:a] :values [{:a 1 :c 3}]}))))
+
+(deftest test-insert-map-rows-with-different-key-counts
+  (is (= ["INSERT INTO t (a, b, c) VALUES (?, ?, ?), (?, ?, ?)" [1 nil nil nil 2 3]]
+         (sql/format {:insert-into :t :values [{:a 1} {:b 2 :c 3}]}))))

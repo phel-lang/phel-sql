@@ -29,6 +29,19 @@
       (bad-arg (str "values map key(s) not listed in :columns: "
                     (str/join ", " (map show unknown)))))))
 
+(defn- check-rows-not-empty! [rows]
+  (when (some (fn [r] (zero? (count r))) rows)
+    (bad-arg "values rows must not be empty")))
+
+(defn- check-vector-row-widths! [rows expected-width]
+  (let [widths (distinct (map count rows))]
+    (when (and (nil? expected-width) (> (count widths) 1))
+      (bad-arg (str "values rows must all have the same width, got: "
+                    (str/join ", " (map str widths)))))
+    (when (and expected-width (some (fn [w] (not= w expected-width)) widths))
+      (bad-arg (str "values row width must equal the " expected-width " :columns, got: "
+                    (str/join ", " (map str widths)))))))
+
 (defn- normalise-values
   "Returns {:columns-sql ... :values-sql ... :params [...]}.
    For map rows, columns are `explicit-cols` when given, else the union of
@@ -39,21 +52,25 @@
     (bad-arg "values expects a non-empty vector"))
   (cond
     (every? map? vs)
-    (let [row-keys (distinct (mapcat keys vs))
+    (let [_        (check-rows-not-empty! vs)
+          row-keys (distinct (mapcat keys vs))
           cols     (if explicit-cols
                      (do
                        (check-keys-in-columns! row-keys explicit-cols)
                        (vec explicit-cols))
                      (vec (sort (fn [a b] (php/strcmp (name a) (name b))) row-keys)))
-          rows (map (fn [r] (vec (map (fn [k] (get r k)) cols))) vs)]
+          rows     (map (fn [r] (vec (map (fn [k] (get r k)) cols))) vs)]
       {:columns-sql (str "(" (str/join ", " (map ident cols)) ")")
        :values-sql  (str "VALUES " (str/join ", " (map row-placeholders rows)))
        :params      (vec (mapcat identity rows))})
 
     (every? vector? vs)
-    {:columns-sql nil
-     :values-sql  (str "VALUES " (str/join ", " (map row-placeholders vs)))
-     :params      (vec (mapcat identity vs))}
+    (do
+      (check-rows-not-empty! vs)
+      (check-vector-row-widths! vs (when explicit-cols (count explicit-cols)))
+      {:columns-sql nil
+       :values-sql  (str "VALUES " (str/join ", " (map row-placeholders vs)))
+       :params      (vec (mapcat identity vs))})
 
     :else
     (bad-arg "values items must all be vectors or all be maps")))
