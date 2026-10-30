@@ -85,3 +85,38 @@
   (is (thrown? \InvalidArgumentException
                (sql/format {:select [:id] :from [:t]
                             :where [:exists {:select [:1]} {:select [:2]}]}))))
+
+(deftest test-rejects-empty-select
+  (is (thrown? \InvalidArgumentException (sql/format {:select [] :from [:t]}))))
+
+(deftest test-rejects-nil-select
+  (is (thrown? \InvalidArgumentException (sql/format {:select nil :from [:t]}))))
+
+(deftest test-rejects-keyword-select
+  (is (thrown? \InvalidArgumentException (sql/format {:select :id :from [:t]}))))
+
+(deftest test-rejects-empty-from
+  (is (thrown? \InvalidArgumentException (sql/format {:select [:id] :from []}))))
+
+(deftest test-rejects-empty-group-by
+  (is (thrown? \InvalidArgumentException (sql/format {:select [:id] :from [:t] :group-by []}))))
+
+(deftest test-rejects-empty-order-by
+  (is (thrown? \InvalidArgumentException (sql/format {:select [:id] :from [:t] :order-by []}))))
+
+(deftest test-rejects-empty-returning
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:delete-from :t :returning []}))))
+
+(deftest test-rejects-empty-columns
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t :columns [] :values [[1]]}))))
+
+(deftest test-rejects-keyword-partition-by
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:over [:fn :sum :x] {:partition-by :a}]] :from [:t]}))))
+
+(deftest test-error-message-names-the-clause
+  (let [msg (try (sql/format {:select [:id] :from [:t] :group-by []})
+                 (catch \InvalidArgumentException e (.getMessage e)))]
+    (is (php/str_contains msg ":group-by"))))

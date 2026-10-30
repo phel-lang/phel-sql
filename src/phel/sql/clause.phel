@@ -4,11 +4,11 @@
 ;; Simple SELECT-side clauses
 ;; ===========================================================================
 
-(defn- emit-select          [cols]  (prefixed "SELECT" (idents+ cols)))
-(defn- emit-select-distinct [cols]  (prefixed "SELECT DISTINCT" (idents+ cols)))
-(defn- emit-from            [xs]    (prefixed "FROM"   (idents+ xs)))
-(defn- emit-group-by        [cols]  (prefixed "GROUP BY" (idents+ cols)))
-(defn- emit-returning       [cols]  (prefixed "RETURNING" (idents+ cols)))
+(defn- emit-select [cols] (prefixed "SELECT" (idents+ (non-empty-vector! :select cols))))
+(defn- emit-select-distinct [cols] (prefixed "SELECT DISTINCT" (idents+ (non-empty-vector! :select-distinct cols))))
+(defn- emit-from [xs] (prefixed "FROM" (idents+ (non-empty-vector! :from xs))))
+(defn- emit-group-by [cols] (prefixed "GROUP BY" (idents+ (non-empty-vector! :group-by cols))))
+(defn- emit-returning [cols] (prefixed "RETURNING" (idents+ (non-empty-vector! :returning cols))))
 (defn- emit-where-clause    [w]     (prefixed "WHERE"  (emit-where w)))
 (defn- emit-having-clause   [w]     (prefixed "HAVING" (emit-where w)))
 
@@ -54,10 +54,10 @@
 (defn- emit-for [spec]
   (let [[mode lock] (if (vector? spec) spec [spec nil])
         mode-sql    (or (get for-modes mode)
-                     (bad-arg (str "for mode must be one of "
-                                   (str/join ", " (map name (keys for-modes)))
-                                   ", got: " (show mode))))
+                        (bad-arg (str "for mode must be one of "
+                                      (str/join ", " (map name (keys for-modes)))
+                                      ", got: " (show mode))))
         lock-sql    (when lock
-                   (or (get for-locks lock)
-                       (bad-arg (str "for lock must be :nowait or :skip-locked, got: " (show lock)))))]
+                      (or (get for-locks lock)
+                          (bad-arg (str "for lock must be :nowait or :skip-locked, got: " (show lock)))))]
     [(if lock-sql (str "FOR " mode-sql " " lock-sql) (str "FOR " mode-sql)) []]))
