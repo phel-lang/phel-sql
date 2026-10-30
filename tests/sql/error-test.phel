@@ -126,3 +126,15 @@
 
 (deftest test-rejects-bare-update
   (is (thrown? \InvalidArgumentException (sql/format {:update :t}))))
+
+(deftest test-rejects-plain-vector-operand
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where [:= :a [1 2]]}))))
+
+(deftest test-rejects-unknown-tag-operand
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where [:= :a [:foo 1]]}))))
+
+(deftest test-rejects-nested-vector-in-list
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where [:in :a [[1 2]]]}))))

@@ -17,6 +17,7 @@ The compiler has a small classification:
 | `[:filter ...]`     | aggregate FILTER         | aggregate FILTER            |
 | `[:lateral ...]`    | LATERAL subquery         | LATERAL subquery            |
 | map                 | subquery `(...)`         | subquery `(...)`            |
+| other vector        | error                    | error (cannot be bound)     |
 | anything else       | error                    | parameter `?`               |
 
 The split matters when the same form could mean two things. Inside `:where` and `:set`, strings are values (bound as `?`). Inside `:select` and `:from`, strings are raw identifiers. To use a raw expression in `:where`, wrap it with `[:raw "..."]` (or use one of the higher-level tagged forms).
