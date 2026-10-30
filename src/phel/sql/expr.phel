@@ -82,7 +82,7 @@
   (cond
     (keyword? t)                                        (or (get frame-tokens t)
                      (bad-arg (str "Unknown frame token: " (show t))))
-    (and (vector? t) (= 2 (count t)) (int? (second t)))
+    (and (vector? t) (= 2 (count t)) (int? (second t)) (>= (second t) 0))
     (case (first t)
       :preceding (str (second t) " PRECEDING")
       :following (str (second t) " FOLLOWING")
@@ -134,9 +134,14 @@
   (let [[s p] (compile-query q)]
     [(str "LATERAL (" s ")") p]))
 
+(defn- emit-raw [x]
+  (when-not (and (= 2 (count x)) (string? (second x)))
+    (bad-arg (str "raw expects [:raw \"SQL\"], got: " (show x))))
+  [(second x) []])
+
 (defn- emit-tagged [x]
   (case (first x)
-    :raw     [(second x) []]
+    :raw     (emit-raw x)
     :fn      (emit-fn-call x)
     :cast    (emit-cast x)
     :case    (emit-case x)

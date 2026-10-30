@@ -34,3 +34,7 @@
 (deftest test-order-by-rejects-bad-nulls
   (is (thrown? \InvalidArgumentException
                (sql/format {:select [:id] :from [:t] :order-by [[:n :asc :sometimes]]}))))
+
+(deftest test-order-by-raw-fragment-with-direction
+  (is (= ["SELECT id FROM t ORDER BY x DESC" []]
+         (sql/format {:select [:id] :from [:t] :order-by [[[:raw "x"] :desc]]}))))

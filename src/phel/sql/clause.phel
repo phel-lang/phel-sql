@@ -52,6 +52,8 @@
    :skip-locked "SKIP LOCKED"})
 
 (defn- emit-for [spec]
+  (when (and (vector? spec) (not (<= 1 (count spec) 2)))
+    (bad-arg (str "for expects a mode or [mode lock], got: " (show spec))))
   (let [[mode lock] (if (vector? spec) spec [spec nil])
         mode-sql    (or (get for-modes mode)
                         (bad-arg (str "for mode must be one of "

@@ -29,7 +29,9 @@
     (tagged? x)   (emit-tagged x)
     (subquery? x) (let [[s p] (compile-query x)] [(str "(" s ")") p])
     (vector? x)
-    (let [[base alias]     x
+    (let [_                (when-not (= 2 (count x))
+                             (bad-arg (str "alias expects [base alias], got: " (show x))))
+          [base alias]     x
           [b-sql b-params] (ident+ base)]
       [(str b-sql " AS " (ident alias)) b-params])
     :else         [(ident x) []]))

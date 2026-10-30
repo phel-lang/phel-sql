@@ -150,3 +150,28 @@
 (deftest test-error-message-shows-map-on-one-line
   (is (= "Unsupported order-by item: {:a 1}"
          (error-message {:select [:id] :from [:t] :order-by [{:a 1}]}))))
+
+(deftest test-rejects-raw-without-sql
+  (is (thrown? \InvalidArgumentException (sql/format {:select [[:raw]] :from [:t]}))))
+
+(deftest test-rejects-raw-with-non-string
+  (is (thrown? \InvalidArgumentException (sql/format {:select [[:raw 42]] :from [:t]}))))
+
+(deftest test-rejects-raw-with-extra-args
+  (is (thrown? \InvalidArgumentException (sql/format {:select [[:raw "a" "b"]] :from [:t]}))))
+
+(deftest test-rejects-alias-with-extra-elements
+  (is (thrown? \InvalidArgumentException (sql/format {:select [[:id :a :b]] :from [:t]}))))
+
+(deftest test-rejects-for-with-extra-elements
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :for [:update :nowait :extra]}))))
+
+(deftest test-rejects-raw-with-order-direction
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :order-by [[:raw "x" :desc]]}))))
+
+(deftest test-rejects-negative-frame-offset
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:over [:fn :sum :x] {:frame [:rows [:preceding -1]]}]]
+                            :from [:t]}))))

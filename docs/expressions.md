@@ -12,7 +12,7 @@ composable: put a `:case` inside an `:over`, a `:filter` inside a `:fn`, a
 
 ## `[:raw "SQL"]`
 
-Literal SQL fragment. Contributes no params. The compiler does not validate it.
+Literal SQL fragment. The vector has exactly two elements and the second is a string; any other shape throws. Contributes no params. The compiler does not validate the SQL.
 
 ```phel
 [:raw "NOW()"]              ; -> NOW()
