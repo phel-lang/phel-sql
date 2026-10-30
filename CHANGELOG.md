@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clauses that list columns or tables throw a clear error for empty or non-vector values instead of emitting invalid SQL or leaking a Phel runtime message (#12)
 - UPDATE without `:set` throws instead of compiling to invalid SQL (#13)
 - Untagged vectors in value positions throw instead of being bound as one parameter, so a mistyped tag like `[:fnn ...]` is reported (#14)
+- Error messages show offending values as Phel literals (`:bogus`, `{:a 1}`) instead of a `var_export` dump of internals (#15)
 
 ## [0.2.1] - 2026-10-07
 
