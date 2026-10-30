@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Docs list every identifier position that renders a string verbatim, including `:set` keys, function names, cast types and aliases (#17)
+- The README links to the list of identifier positions that render a string verbatim (#17)
 
 ## [0.2.1] - 2026-10-07
 

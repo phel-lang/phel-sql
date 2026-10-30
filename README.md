@@ -72,7 +72,7 @@ Tagged expression forms usable anywhere an identifier or operand is accepted:
 | `[:filter expr where]`             | aggregate `FILTER (WHERE ...)`           |
 | `[:lateral subquery]`              | `LATERAL (...)`                          |
 
-Subqueries (maps) work anywhere an identifier or value is accepted. `[:raw "SQL"]` is the escape hatch for fragments the DSL does not yet cover.
+Subqueries (maps) work anywhere an identifier or value is accepted. `[:raw "SQL"]` is the escape hatch for fragments the DSL does not yet cover. A string in an identifier position is also rendered verbatim: [see where](docs/parameters.md#raw-string).
 
 ## Docs
 
