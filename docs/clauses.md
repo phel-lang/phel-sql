@@ -258,7 +258,7 @@ A map of column to value. Cannot be combined with `:on-conflict`.
  :where [:= :id 1]}
 ```
 
-`:set` is a map of column to value. Keyword values become column copies. Raw / tagged forms work. The map is sorted alphabetically for deterministic output.
+`:set` is required. It is a map of column to value. Keyword values become column copies. Raw / tagged forms work. The map is sorted alphabetically for deterministic output.
 
 UPDATE accepts `:from`, `:where`, `:order-by`, `:limit`, `:returning`.
 

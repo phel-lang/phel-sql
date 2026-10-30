@@ -108,7 +108,9 @@
   (mutex-select-mode! q)
   (emit-ordered q select-emitters select-order))
 
-(defn- emit-update-stmt [q] (emit-ordered q update-emitters update-order))
+(defn- emit-update-stmt [q]
+  (when-not (contains? q :set) (bad-arg "update statement requires :set"))
+  (emit-ordered q update-emitters update-order))
 (defn- emit-delete-stmt [q] (emit-ordered q delete-emitters delete-order))
 
 (def- insert-allowed
