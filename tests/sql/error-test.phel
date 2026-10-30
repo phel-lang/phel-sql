@@ -39,3 +39,20 @@
 (deftest test-rejects-insert-empty-map-row
   (is (thrown? \InvalidArgumentException
                (sql/format {:insert-into :t :values [{}]}))))
+
+(deftest test-rejects-on-conflict-where-without-on-conflict
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t :values [[1]] :on-conflict-where [:= :a 1]}))))
+
+(deftest test-rejects-do-nothing-without-on-conflict
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t :values [[1]] :do-nothing true}))))
+
+(deftest test-rejects-do-update-set-without-on-conflict
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t :values [[1]] :do-update-set {:a 1}}))))
+
+(deftest test-rejects-do-update-where-without-do-update-set
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t :values [[1]] :on-conflict [:id]
+                            :do-nothing true :do-update-where [:= :a 1]}))))

@@ -120,6 +120,7 @@
   (check-unknown! query insert-allowed)
   (when-not (contains? query :insert-into) (bad-arg "insert statement requires :insert-into"))
   (when-not (contains? query :values)      (bad-arg "insert statement requires :values"))
+  (check-upsert-keys! query)
   (when (and (contains? query :on-conflict) (contains? query :on-duplicate-key-update))
     (bad-arg ":on-conflict and :on-duplicate-key-update are mutually exclusive"))
   (let [vs                (normalise-values (get query :values) (get query :columns))
