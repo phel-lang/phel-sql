@@ -80,7 +80,7 @@ Vector of tables. Items: keyword, `[table alias]`, `[subquery alias]`, or `[[:la
 
 A single vector: `[op & args]`.
 
-Binary: `:=`, `:!=`, `:<`, `:>`, `:<=`, `:>=`, `:like`, `:not-like`, `:ilike`, `:not-ilike`. Both sides go through the operand rules.
+Binary: `:=`, `:!=`, `:<`, `:>`, `:<=`, `:>=`, `:like`, `:not-like`, `:ilike`, `:not-ilike`. Both sides go through the operand rules. A literal `nil` on either side of `:=` or `:!=` compiles to `IS NULL` or `IS NOT NULL`, because `a = NULL` never matches in SQL. Other operators bind `nil` as a parameter.
 
 Logical: `:and`, `:or`, `:not`.
 

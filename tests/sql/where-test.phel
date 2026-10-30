@@ -134,3 +134,19 @@
 (deftest test-rejects-empty-and
   (is (thrown? \InvalidArgumentException
                (sql/format {:select [:id] :from [:t] :where [:and]}))))
+
+(deftest test-equals-nil-becomes-is-null
+  (is (= ["SELECT id FROM t WHERE a IS NULL" []]
+         (sql/format {:select [:id] :from [:t] :where [:= :a nil]}))))
+
+(deftest test-not-equals-nil-becomes-is-not-null
+  (is (= ["SELECT id FROM t WHERE a IS NOT NULL" []]
+         (sql/format {:select [:id] :from [:t] :where [:!= :a nil]}))))
+
+(deftest test-nil-on-the-left-is-rewritten-too
+  (is (= ["SELECT id FROM t WHERE a IS NULL" []]
+         (sql/format {:select [:id] :from [:t] :where [:= nil :a]}))))
+
+(deftest test-nil-with-other-operators-stays-a-parameter
+  (is (= ["SELECT id FROM t WHERE a < ?" [nil]]
+         (sql/format {:select [:id] :from [:t] :where [:< :a nil]}))))
