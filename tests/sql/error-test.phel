@@ -23,3 +23,19 @@
 (deftest test-rejects-map-row-key-outside-columns
   (is (thrown? \InvalidArgumentException
                (sql/format {:insert-into :t :columns [:a] :values [{:a 1 :c 3}]}))))
+
+(deftest test-rejects-insert-row-width-differs-from-columns
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t :columns [:a :b] :values [[1]]}))))
+
+(deftest test-rejects-insert-ragged-vector-rows
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t :values [[1 2] [3]]}))))
+
+(deftest test-rejects-insert-empty-vector-row
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t :values [[]]}))))
+
+(deftest test-rejects-insert-empty-map-row
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t :values [{}]}))))
