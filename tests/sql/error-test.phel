@@ -138,3 +138,15 @@
 (deftest test-rejects-nested-vector-in-list
   (is (thrown? \InvalidArgumentException
                (sql/format {:select [:id] :from [:t] :where [:in :a [[1 2]]]}))))
+
+(defn- error-message [query]
+  (try (sql/format query)
+       (catch \InvalidArgumentException e (.getMessage e))))
+
+(deftest test-error-message-shows-keyword-as-phel-literal
+  (is (= "Unknown where operator: :bogus"
+         (error-message {:select [:id] :from [:t] :where [:bogus :a 1]}))))
+
+(deftest test-error-message-shows-map-on-one-line
+  (is (= "Unsupported order-by item: {:a 1}"
+         (error-message {:select [:id] :from [:t] :order-by [{:a 1}]}))))
