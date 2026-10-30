@@ -15,6 +15,17 @@
     (bad-arg (str ":on-conflict target must be a vector of columns or {:on-constraint name}, got: "
                   (show target)))))
 
+(def- upsert-keys-requiring-on-conflict
+  [:on-conflict-where :do-nothing :do-update-set :do-update-where])
+
+(defn- check-upsert-keys! [query]
+  (when-not (contains? query :on-conflict)
+    (doseq [k upsert-keys-requiring-on-conflict]
+      (when (contains? query k)
+        (bad-arg (str k " requires :on-conflict")))))
+  (when (and (contains? query :do-update-where) (not (contains? query :do-update-set)))
+    (bad-arg ":do-update-where requires :do-update-set")))
+
 (defn- emit-on-conflict-block [query]
   (when (contains? query :on-conflict)
     (let [target                     (get query :on-conflict)
@@ -26,8 +37,6 @@
           do-update-where            (get query :do-update-where)]
       (when (and do-nothing? do-update)
         (bad-arg ":do-nothing and :do-update-set are mutually exclusive"))
-      (when (and (contains? query :on-conflict-where) (not (contains? query :on-conflict)))
-        (bad-arg ":on-conflict-where requires :on-conflict"))
       (let [head        (str "ON CONFLICT" target-sql
                       (when where-sql (str " WHERE " (first where-sql))))
             head-params (concat target-params (if where-sql (second where-sql) []))]
