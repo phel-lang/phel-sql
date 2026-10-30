@@ -19,3 +19,7 @@
 (deftest test-rejects-select-clauses-in-delete
   (is (thrown? \InvalidArgumentException
                (sql/format {:delete-from :t :group-by [:b]}))))
+
+(deftest test-rejects-map-row-key-outside-columns
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t :columns [:a] :values [{:a 1 :c 3}]}))))

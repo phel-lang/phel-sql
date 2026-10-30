@@ -122,7 +122,7 @@
   (when-not (contains? query :values)      (bad-arg "insert statement requires :values"))
   (when (and (contains? query :on-conflict) (contains? query :on-duplicate-key-update))
     (bad-arg ":on-conflict and :on-duplicate-key-update are mutually exclusive"))
-  (let [vs                (normalise-values (get query :values))
+  (let [vs                (normalise-values (get query :values) (get query :columns))
         columns-sql       (cond
                       (contains? query :columns) (first (emit-columns (get query :columns)))
                       :else                      (get vs :columns-sql))
@@ -152,7 +152,7 @@
 
 (defn- emit-values-stmt [query]
   (check-unknown! query #{:values})
-  (let [vs (normalise-values (get query :values))]
+  (let [vs (normalise-values (get query :values) nil)]
     [(get vs :values-sql) (get vs :params)]))
 
 (defn- find-set-op [query]

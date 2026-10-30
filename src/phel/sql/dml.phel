@@ -22,20 +22,29 @@
 (defn- row-placeholders [row]
   (str "(" (str/join ", " (map (fn [_] "?") row)) ")"))
 
+(defn- check-keys-in-columns! [row-keys cols]
+  (let [allowed (set cols)
+        unknown (filter (fn [k] (not (contains? allowed k))) row-keys)]
+    (when (seq unknown)
+      (bad-arg (str "values map key(s) not listed in :columns: "
+                    (str/join ", " (map show unknown)))))))
+
 (defn- normalise-values
   "Returns {:columns-sql ... :values-sql ... :params [...]}.
-   For map rows, columns are the union of keys (alphabetical for stability)
-   and columns-sql is included. For vector rows, columns-sql is nil."
-  [vs]
+   For map rows, columns are `explicit-cols` when given, else the union of
+   keys (alphabetical for stability), and columns-sql is included. For vector
+   rows, columns-sql is nil."
+  [vs explicit-cols]
   (when-not (and (vector? vs) (seq vs))
     (bad-arg "values expects a non-empty vector"))
   (cond
     (every? map? vs)
-    (let [cols (->> vs
-                    (mapcat keys)
-                    distinct
-                    (sort (fn [a b] (php/strcmp (name a) (name b))))
-                    vec)
+    (let [row-keys (distinct (mapcat keys vs))
+          cols     (if explicit-cols
+                     (do
+                       (check-keys-in-columns! row-keys explicit-cols)
+                       (vec explicit-cols))
+                     (vec (sort (fn [a b] (php/strcmp (name a) (name b))) row-keys)))
           rows (map (fn [r] (vec (map (fn [k] (get r k)) cols))) vs)]
       {:columns-sql (str "(" (str/join ", " (map ident cols)) ")")
        :values-sql  (str "VALUES " (str/join ", " (map row-placeholders rows)))
