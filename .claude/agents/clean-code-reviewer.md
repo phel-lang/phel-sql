@@ -25,7 +25,7 @@ Analyze staged changes (`git diff --cached`), unstaged (`git diff`), or branch d
 | Side Effects | Pure `[sql params]` returns | Anything that hits I/O / globals |
 | Errors | Specific message with offending shape | Silent fallback, generic throw |
 
-## DSL Smells (`src/sql/`)
+## DSL Smells (`src/phel/sql/`)
 
 | Smell | Symptom | Remedy |
 |-------|---------|--------|
@@ -33,7 +33,7 @@ Analyze staged changes (`git diff --cached`), unstaged (`git diff`), or branch d
 | Hand-built params | Concatenating values into SQL string | Collect params via `[sql params]` tuple |
 | Per-call subquery handling | Reimplementing recursion at call site | Route through `ident+` / `operand` / `compile-query` |
 | Public helper without docs | `defn` missing `:doc` / `:example` | Add metadata, or make it `defn-` |
-| Forgotten forward decl | New cross-file symbol fails to load | Add `(declare ...)` in `src/sql.phel` |
+| Forgotten forward decl | New cross-file symbol fails to load | Add `(declare ...)` in `src/phel/sql.phel` |
 
 ## Test Smells (`tests/sql/`)
 

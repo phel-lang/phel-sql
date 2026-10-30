@@ -1,6 +1,6 @@
 ---
 description: Clause / emitter / dispatch rules for phel-sql
-globs: src/sql/**,src/sql.phel
+globs: src/phel/sql/**,src/phel/sql.phel
 ---
 
 # SQL DSL Rules
@@ -8,11 +8,11 @@ globs: src/sql/**,src/sql.phel
 ## Architecture (two layers)
 
 1. **Expressions** — `ident+`, `operand`, `emit-tagged` handle anything inside a clause (identifiers, values, tagged forms, subqueries). Always return `[sql params]`.
-2. **Clauses** — emitter functions registered in dispatch maps in `src/sql/dispatch.phel`:
+2. **Clauses** — emitter functions registered in dispatch maps in `src/phel/sql/dispatch.phel`:
    - `select-emitters` / `select-order`
    - `update-emitters` / `update-order`
    - `delete-emitters` / `delete-order`
-   INSERT and set-ops are hand-assembled in `src/sql/dml.phel` and via the dispatch entry point.
+   INSERT and set-ops are hand-assembled in `src/phel/sql/dml.phel` and via the dispatch entry point.
 
 `statement-type` auto-detects the kind from clause keys present.
 
@@ -25,7 +25,7 @@ globs: src/sql/**,src/sql.phel
 
 ## Adding a clause to SELECT
 
-1. Write `defn- emit-<name> [v]` in `src/sql/clause.phel` (or appropriate file).
+1. Write `defn- emit-<name> [v]` in `src/phel/sql/clause.phel` (or appropriate file).
 2. Register it in `select-emitters` and place its keyword in `select-order` at the correct position.
 3. Add a `tests/sql/<name>-test.phel` per accepted shape and per error.
 4. Update README coverage table and `docs/clauses.md`.

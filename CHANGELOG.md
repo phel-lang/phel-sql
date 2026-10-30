@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Move sources to `src/phel/` so the compiled `out/` tree loads the sub-files. `phel build` followed by `require "out/index.php"` no longer throws `Cannot locate sql/util` (#2).
+
 ## [0.2.1] - 2026-10-07
 
 ### Fixed

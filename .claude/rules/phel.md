@@ -9,7 +9,7 @@ globs: src/**,tests/**
 
 - kebab-case for symbols: `emit-where`, `compile-query`, `binary-ops`.
 - `defn-` / `def-` for private (not part of the public API).
-- Namespace `phel.sql`. Sub-files in `src/sql/` start with `(in-ns phel.sql)`.
+- Namespace `phel.sql`. Sub-files in `src/phel/sql/` start with `(in-ns phel.sql)`.
 - Test namespaces: `phel-sql-tests.sql.<topic>-test`.
 
 ## Docstrings
@@ -34,7 +34,7 @@ Public functions (only `sql/format` and supporting public helpers) get:
 
 ## Multi-file namespace
 
-`src/sql.phel` declares cross-file symbols up-front with `(declare ...)` then `(load "sql/<file>")`s the sub-files. Adding a new cross-file fn? Update the declare block first.
+`src/phel/sql.phel` declares cross-file symbols up-front with `(declare ...)` then `(load "sql/<file>")`s the sub-files. Adding a new cross-file fn? Update the declare block first.
 
 ## Tests (`tests/sql/`)
 

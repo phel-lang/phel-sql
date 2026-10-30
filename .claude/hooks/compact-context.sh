@@ -9,7 +9,7 @@ cat <<'EOF'
 - Test: `composer test` (runs `vendor/bin/phel test`).
 - Format: `composer format`. `.phel` edits auto-format via PostToolUse hook.
 - Architecture: expressions (`ident+`, `operand`, `emit-tagged`) and clauses (dispatch maps). Statement kind auto-detected by `statement-type`.
-- Sub-files in `src/sql/` start with `(in-ns phel.sql)`; cross-file fn refs resolve at call time.
+- Sub-files in `src/phel/sql/` start with `(in-ns phel.sql)`; cross-file fn refs resolve at call time.
 - Protected files: `release.sh`, `.github/*`, `composer.lock`.
 - `feat:`/`fix:` commits must update `## [Unreleased]` in `CHANGELOG.md`.
 - PR template at `.github/PULL_REQUEST_TEMPLATE.md` (📚 Description / 🔖 Changes). Assign `@me`. Labels: `bug`, `enhancement`, `refactoring`, `documentation`, `pure testing`, `dependencies`.

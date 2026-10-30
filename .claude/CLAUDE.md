@@ -5,8 +5,8 @@ Data-driven SQL DSL for [Phel Lang](https://phel-lang.org/). Pure Phel. Map in, 
 ## Architecture
 
 ```
-src/sql.phel             public API + cross-file declarations + multi-file loader
-src/sql/                 emitters split by concern (clause, where, join, dml, expr, ...)
+src/phel/sql.phel             public API + cross-file declarations + multi-file loader
+src/phel/sql/                 emitters split by concern (clause, where, join, dml, expr, ...)
 tests/sql/*-test.phel    deftest per clause / per error path
 tests/e2e-test.phel      end-to-end black-box scenarios
 docs/                    user-facing docs (quickstart, clauses, expressions, parameters)
@@ -23,7 +23,7 @@ phel-config.php          flat layout, library, namespace `phel.sql`
 clause keyword → emitter fn → [sql params]
 ```
 
-Per-statement maps and order vectors live in `src/sql/dispatch.phel`:
+Per-statement maps and order vectors live in `src/phel/sql/dispatch.phel`:
 `select-emitters` / `select-order`, `update-emitters` / `update-order`, `delete-emitters` / `delete-order`. INSERT + set-ops are hand-assembled. Statement kind auto-detected by `statement-type`.
 
 ## Testing
@@ -40,8 +40,8 @@ No PHP source. No PHPUnit. Single test runner, single formatter.
 
 | Changed                  | Command                                  |
 |--------------------------|------------------------------------------|
-| `src/sql.phel`           | `composer test`                           |
-| `src/sql/<file>.phel`    | `vendor/bin/phel test tests/sql/<file>-test.phel` for focused work |
+| `src/phel/sql.phel`           | `composer test`                           |
+| `src/phel/sql/<file>.phel`    | `vendor/bin/phel test tests/sql/<file>-test.phel` for focused work |
 | `tests/sql/<x>-test.phel`| `vendor/bin/phel test tests/sql/<x>-test.phel` |
 | Anything user-facing     | Update `CHANGELOG.md` under `## [Unreleased]` |
 
@@ -54,7 +54,7 @@ No PHP source. No PHPUnit. Single test runner, single formatter.
 
 ## Adding stuff (see `docs/contributing.md`)
 
-- **New SELECT clause** → emitter in `src/sql/clause.phel`, register in dispatch map + order vector, tests per shape and per error, update `docs/clauses.md` + README table.
+- **New SELECT clause** → emitter in `src/phel/sql/clause.phel`, register in dispatch map + order vector, tests per shape and per error, update `docs/clauses.md` + README table.
 - **New WHERE op** → add to `binary-ops` or extend `case` in `emit-where`, tests, doc.
 - **New tagged form** → add tag to `expr-tags`, write `emit-<thing>`, branch in `emit-tagged`, tests, `docs/expressions.md` entry.
 
