@@ -37,3 +37,15 @@
 (deftest test-insert-rejects-mixed-rows
   (is (thrown? \InvalidArgumentException
                (sql/format {:insert-into :users :values [{:name "a"} ["b"]]}))))
+
+(deftest test-insert-map-rows-follow-explicit-columns-order
+  (is (= ["INSERT INTO t (b, a) VALUES (?, ?)" [2 1]]
+         (sql/format {:insert-into :t :columns [:b :a] :values [{:a 1 :b 2}]}))))
+
+(deftest test-insert-map-rows-explicit-columns-missing-key-is-nil
+  (is (= ["INSERT INTO t (a, b) VALUES (?, ?)" [1 nil]]
+         (sql/format {:insert-into :t :columns [:a :b] :values [{:a 1}]}))))
+
+(deftest test-insert-map-rows-reject-key-outside-columns
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t :columns [:a] :values [{:a 1 :c 3}]}))))

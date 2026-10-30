@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Move sources to `src/phel/` so the compiled `out/` tree loads the sub-files. `phel build` followed by `require "out/index.php"` no longer throws `Cannot locate sql/util` (#2).
+- INSERT with `:columns` and map rows binds values in `:columns` order and rejects map keys not listed in `:columns` (#8)
 
 ## [0.2.1] - 2026-10-07
 
