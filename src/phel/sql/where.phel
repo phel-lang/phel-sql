@@ -12,12 +12,20 @@
    :ilike    "ILIKE"
    :not-ilike "NOT ILIKE"})
 
-(defn- emit-binary [op-sql args]
-  (let [[lhs rhs]        args
+(defn- emit-binary [op args]
+  (let [op-sql           (get binary-ops op)
+        [lhs rhs]        args
         [l-sql l-params] (operand lhs)
         [r-sql r-params] (operand rhs)]
     [(str l-sql " " op-sql " " r-sql)
      (concat l-params r-params)]))
+
+(defn- emit-comparison [op args]
+  (let [[lhs rhs] args]
+    (cond
+      (and (contains? #{:= :!=} op) (nil? rhs)) (emit-null lhs (= op :!=))
+      (and (contains? #{:= :!=} op) (nil? lhs)) (emit-null rhs (= op :!=))
+      :else                                     (emit-binary op args))))
 
 (defn- emit-logical [joiner clauses]
   (when (empty? clauses)
@@ -99,5 +107,5 @@
       :exists      (emit-exists args false)
       :not-exists  (emit-exists args true)
       (if (contains? binary-ops op)
-        (emit-binary (get binary-ops op) args)
+        (emit-comparison op args)
         (bad-arg (str "Unknown where operator: " (show op)))))))
