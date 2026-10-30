@@ -120,3 +120,9 @@
   (let [msg (try (sql/format {:select [:id] :from [:t] :group-by []})
                  (catch \InvalidArgumentException e (.getMessage e)))]
     (is (php/str_contains msg ":group-by"))))
+
+(deftest test-rejects-update-without-set
+  (is (thrown? \InvalidArgumentException (sql/format {:update :t :where [:= :id 1]}))))
+
+(deftest test-rejects-bare-update
+  (is (thrown? \InvalidArgumentException (sql/format {:update :t}))))
