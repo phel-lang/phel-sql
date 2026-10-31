@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Cookbook with dynamic filters, pagination, upsert, CTE, window ranking, a PDO example and an FAQ; `sql/format` docstring has a multi-statement example and `:see-also` (#44)
 - Set operations accept `:with`, `:with-recursive`, `:order-by`, `:limit` and `:offset`; other extra keys still throw (#46)
 - INSERT ... SELECT: `:query` takes a SELECT, VALUES or set operation query in place of `:values`, and works with `:with`, upserts and `:returning` (#45)
 - `:window` clause for named windows, `[:over expr :name]` to use one, and a `:window` key in window specs to extend one (#50)

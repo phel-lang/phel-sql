@@ -64,7 +64,16 @@
 
   Throws InvalidArgumentException on unknown clauses or malformed data."
   {:example "(format {:select [:id :name] :from [:users] :where [:= :status \"active\"]})
-            ; => [\"SELECT id, name FROM users WHERE status = ?\" [\"active\"]]"
-   :see-also []}
+            ; => [\"SELECT id, name FROM users WHERE status = ?\" [\"active\"]]
+
+            (format {:insert-into :users :values [{:name \"alice\"}] :returning [:id]})
+            ; => [\"INSERT INTO users (name) VALUES (?) RETURNING id\" [\"alice\"]]
+
+            (format {:update :users :set {:status \"banned\"} :where [:= :id 42]})
+            ; => [\"UPDATE users SET status = ? WHERE id = ?\" [\"banned\" 42]]
+
+            (format {:delete-from :users :where [:= :id 42]})
+            ; => [\"DELETE FROM users WHERE id = ?\" [42]]"
+   :see-also ["to-php-array"]}
   [query]
   (compile-query query))

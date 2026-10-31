@@ -8,6 +8,7 @@ Turn a Phel map into a `[sql params]` tuple. Pure functions, no I/O, no database
 - **[Clauses](clauses.md)**: every clause, every operator, every error.
 - **[Expressions](expressions.md)**: tagged forms (`:fn`, `:cast`, `:case`, `:over`, `:filter`, `:lateral`, `:raw`).
 - **[Parameters](parameters.md)**: identifier rules, values, subqueries, raw fragments.
+- **[Cookbook](cookbook.md)**: dynamic filters, pagination, upsert, CTE, window ranking, running a query with PDO, FAQ.
 - **[Contributing](contributing.md)**: repo layout, tests, how to add a clause or operator.
 
 ## Mental model
