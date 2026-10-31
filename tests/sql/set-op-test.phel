@@ -41,4 +41,51 @@
   (is (thrown? \InvalidArgumentException
                (sql/format {:union [{:select [:id] :from [:a]}
                                     {:select [:id] :from [:b]}]
-                            :limit 10}))))
+                            :where [:= :x 1]}))))
+
+(deftest test-set-op-order-by
+  (is (= ["(SELECT id FROM a) UNION (SELECT id FROM b) ORDER BY id DESC" []]
+         (sql/format {:union    [{:select [:id] :from [:a]}
+                                 {:select [:id] :from [:b]}]
+                      :order-by [[:id :desc]]}))))
+
+(deftest test-set-op-limit
+  (is (= ["(SELECT id FROM a) UNION ALL (SELECT id FROM b) LIMIT 20" []]
+         (sql/format {:union-all [{:select [:id] :from [:a]}
+                                  {:select [:id] :from [:b]}]
+                      :limit     20}))))
+
+(deftest test-set-op-offset
+  (is (= ["(SELECT id FROM a) INTERSECT (SELECT id FROM b) OFFSET 5" []]
+         (sql/format {:intersect [{:select [:id] :from [:a]}
+                                  {:select [:id] :from [:b]}]
+                      :offset    5}))))
+
+(deftest test-set-op-order-by-limit-offset
+  (is (= ["(SELECT id FROM a) EXCEPT (SELECT id FROM b) ORDER BY id LIMIT 20 OFFSET 40" []]
+         (sql/format {:offset 40
+                      :limit  20
+                      :order-by [:id]
+                      :except [{:select [:id] :from [:a]}
+                               {:select [:id] :from [:b]}]}))))
+
+(deftest test-set-op-with
+  (is (= ["WITH c AS (SELECT id FROM t) (SELECT id FROM c) UNION (SELECT id FROM b)" []]
+         (sql/format {:with  [[:c {:select [:id] :from [:t]}]]
+                      :union [{:select [:id] :from [:c]}
+                              {:select [:id] :from [:b]}]}))))
+
+(deftest test-set-op-with-recursive
+  (is (= ["WITH RECURSIVE c AS (SELECT id FROM t) (SELECT id FROM c) UNION (SELECT id FROM b)" []]
+         (sql/format {:with-recursive [[:c {:select [:id] :from [:t]}]]
+                      :union          [{:select [:id] :from [:c]}
+                                       {:select [:id] :from [:b]}]}))))
+
+(deftest test-set-op-params-follow-sql-order-with-cte
+  (is (= ["WITH c AS (SELECT id FROM t WHERE k = ?) (SELECT id FROM c WHERE x = ?) UNION (SELECT id FROM b WHERE y = ?) ORDER BY id LIMIT 3"
+          [1 2 3]]
+         (sql/format {:limit    3
+                      :order-by [:id]
+                      :union    [{:select [:id] :from [:c] :where [:= :x 2]}
+                                 {:select [:id] :from [:b] :where [:= :y 3]}]
+                      :with     [[:c {:select [:id] :from [:t] :where [:= :k 1]}]]}))))

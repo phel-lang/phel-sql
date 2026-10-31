@@ -190,3 +190,28 @@
 (deftest test-rejects-keyword-identifier-with-newline
   (is (thrown? \InvalidArgumentException
                (sql/format {:select [(keyword "a\n")] :from [:t]}))))
+
+(deftest test-rejects-where-on-set-op
+  (is (thrown-with-msg? \InvalidArgumentException "set-op query supports only one of union/union-all/intersect/except, got extras: where"
+                        (sql/format {:union [{:select [:id] :from [:a]}
+                                             {:select [:id] :from [:b]}]
+                                     :where [:= :x 1]}))))
+
+(deftest test-rejects-two-set-op-keys
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:union     [{:select [:id] :from [:a]}
+                                        {:select [:id] :from [:b]}]
+                            :union-all [{:select [:id] :from [:c]}
+                                        {:select [:id] :from [:d]}]}))))
+
+(deftest test-rejects-negative-set-op-limit
+  (is (thrown-with-msg? \InvalidArgumentException "limit must be a non-negative integer, got: -1"
+                        (sql/format {:union [{:select [:id] :from [:a]}
+                                             {:select [:id] :from [:b]}]
+                                     :limit -1}))))
+
+(deftest test-rejects-bad-set-op-with-shape
+  (is (thrown-with-msg? \InvalidArgumentException "WITH binding must be [name query], got: :oops"
+                        (sql/format {:union [{:select [:id] :from [:a]}
+                                             {:select [:id] :from [:b]}]
+                                     :with  [:oops]}))))

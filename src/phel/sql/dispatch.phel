@@ -166,9 +166,25 @@
 (defn- find-set-op [query]
   (first (filter (fn [k] (contains? query k)) set-op-keywords)))
 
+(def- set-op-wrapper-emitters
+  {:with           emit-with
+   :with-recursive emit-with-recursive
+   :order-by       emit-order-by
+   :limit          emit-limit
+   :offset         emit-offset})
+
+(def- set-op-head-order [:with :with-recursive])
+(def- set-op-tail-order [:order-by :limit :offset])
+
+(defn- emit-set-op-wrapper [query clause-order]
+  (->> clause-order
+       (filter (fn [k] (contains? query k)))
+       (map (fn [k] ((get set-op-wrapper-emitters k) (get query k))))))
+
 (defn- emit-set-op-stmt [query]
   (let [op     (find-set-op query)
-        extras (filter (fn [k] (not= k op)) (keys query))]
+        extras (filter (fn [k] (and (not= k op) (not (contains? set-op-wrapper-emitters k))))
+                       (keys query))]
     (when (seq extras)
       (bad-arg (str "set-op query supports only one of "
                     (str/join "/" (map name set-op-keywords))
@@ -176,9 +192,14 @@
     (let [queries (get query op)]
       (when-not (and (vector? queries) (>= (count queries) 2))
         (bad-arg (str (name op) " expects a vector of at least two queries")))
-      (let [parts (map compile-query queries)
-            sqls  (map (fn [[s _]] (str "(" s ")")) parts)]
-        [(str/join (str " " (get set-op-sql op) " ") sqls) (vec (params-of parts))]))))
+      (let [head  (emit-set-op-wrapper query set-op-head-order)
+            parts (map compile-query queries)
+            body  [(str/join (str " " (get set-op-sql op) " ")
+                             (map (fn [[s _]] (str "(" s ")")) parts))
+                   (params-of parts)]
+            tail  (emit-set-op-wrapper query set-op-tail-order)
+            all   (concat head [body] tail)]
+        [(str/join " " (sqls-of all)) (vec (params-of all))]))))
 
 (defn- compile-query [query]
   (when-not (map? query)
