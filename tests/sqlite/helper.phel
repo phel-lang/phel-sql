@@ -1,0 +1,42 @@
+(ns phel-sql-tests.sqlite.helper
+  (:require phel.sql :as sql))
+
+(defn available?
+  "True when PHP has the pdo_sqlite extension."
+  []
+  (php/extension_loaded "pdo_sqlite"))
+
+(defn skip-message []
+  (println "SKIPPED: pdo_sqlite is not loaded, so the SQLite tests did not run."))
+
+(def- schema
+  ["CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT UNIQUE, name TEXT, status TEXT, dept TEXT, salary INTEGER)"
+   "CREATE TABLE orders (id INTEGER PRIMARY KEY, user_id INTEGER, total INTEGER)"
+   "INSERT INTO users VALUES (1, 'a@x', 'alice', 'active', 'eng', 100), (2, 'b@x', 'bob', 'active', 'eng', 200), (3, 'c@x', 'carol', 'banned', 'ops', 150)"
+   "INSERT INTO orders VALUES (1, 1, 10), (2, 1, 20), (3, 2, 30)"])
+
+(defn connect
+  "Fresh in-memory SQLite database with the test schema."
+  []
+  (let [pdo (new \PDO "sqlite::memory:")]
+    (.setAttribute pdo php/PDO::ATTR_ERRMODE php/PDO::ERRMODE_EXCEPTION)
+    (foreach [ddl schema] (.exec pdo ddl))
+    pdo))
+
+(defn run
+  "Prepare and execute a [sql params] tuple. Returns the rows as a vector of vectors."
+  [pdo [query params]]
+  (let [stmt (.prepare pdo query)]
+    ; execute() binds everything as text, which breaks integer comparisons
+    (foreach [i value params]
+      (.bindValue stmt (inc i) value (if (int? value) php/PDO::PARAM_INT php/PDO::PARAM_STR)))
+    (.execute stmt)
+    (vec (map vec (php->phel (.fetchAll stmt php/PDO::FETCH_NUM))))))
+
+(defn run-query
+  "Format a query map and run it on a fresh database. Returns the rows."
+  [query-map]
+  (run (connect) (sql/format query-map)))
+
+(defn placeholder-count [query]
+  (php/substr_count query "?"))

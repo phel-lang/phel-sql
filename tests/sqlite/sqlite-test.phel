@@ -1,0 +1,31 @@
+(ns phel-sql-tests.sqlite.sqlite-test
+  (:require phel.sql :as sql)
+  (:require phel-sql-tests.sqlite.helper :as db)
+  (:require phel-sql-tests.sqlite.corpus :as corpus)
+  (:require phel.test :refer [deftest is]))
+
+(defn- check-query [k]
+  (if (db/available?)
+    (let [[query-map expected] (get corpus/queries k)]
+      (is (= expected (db/run-query query-map))))
+    (db/skip-message)))
+
+(deftest test-sqlite-select-where (check-query :select-where))
+(deftest test-sqlite-select-limit-offset (check-query :select-limit-offset))
+(deftest test-sqlite-group-by-having (check-query :select-group-by-having))
+(deftest test-sqlite-inner-join (check-query :inner-join))
+(deftest test-sqlite-left-join (check-query :left-join))
+(deftest test-sqlite-cte (check-query :cte))
+(deftest test-sqlite-window-function (check-query :window-function))
+(deftest test-sqlite-subquery-in (check-query :subquery-in))
+(deftest test-sqlite-insert-returning (check-query :insert-returning))
+(deftest test-sqlite-on-conflict-do-nothing (check-query :insert-on-conflict-do-nothing))
+(deftest test-sqlite-on-conflict-do-update-returning (check-query :insert-on-conflict-do-update-returning))
+(deftest test-sqlite-update-returning (check-query :update-returning))
+(deftest test-sqlite-delete-returning (check-query :delete-returning))
+
+(deftest test-sqlite-placeholders-match-params-for-every-query
+  (foreach [k (keys corpus/queries)]
+    (let [[query-map _]  (get corpus/queries k)
+          [query params] (sql/format query-map)]
+      (is (= (count params) (db/placeholder-count query)) (str k)))))
