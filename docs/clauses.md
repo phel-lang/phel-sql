@@ -5,7 +5,7 @@ Every clause emits SQL in a fixed order, regardless of map insertion order.
 - SELECT order: `:with`, `:with-recursive`, one of (`:select` / `:select-distinct` / `:select-distinct-on`), `:from`, joins, `:where`, `:group-by`, `:having`, `:order-by`, `:limit`, `:offset`, `:for`, `:returning`.
 - UPDATE order: `:with`, `:update`, `:set`, `:from`, `:where`, `:order-by`, `:limit`, `:returning`.
 - DELETE order: `:with`, `:delete-from`, `:where`, `:order-by`, `:limit`, `:returning`.
-- INSERT order: `:with`, `:insert-into`, `:columns`, `:values`, `:on-conflict` / `:on-duplicate-key-update`, `:returning`.
+- INSERT order: `:with`, `:insert-into`, `:columns`, `:values` or `:query`, `:on-conflict` / `:on-duplicate-key-update`, `:returning`.
 - Top-level VALUES: `{:values [[...] ...]}` with no other keys.
 - Set ops: `{:union [...]}` (and `:union-all`, `:intersect`, `:except`) with optional `:with`, `:with-recursive`, `:order-by`, `:limit` and `:offset`.
 
@@ -192,6 +192,21 @@ A vector of vectors (positional) or a vector of maps, never a mix. Rows must not
                {:name "bob"   :email "b@x"}]}
 ```
 
+### `:query`
+
+Any query map, used instead of `:values`: SELECT, VALUES or a set operation. Its params come after the `:with` params and before the upsert and `:returning` params. `:values` and `:query` are mutually exclusive, and one of them is required.
+
+The query must have `:select`, `:select-distinct` or `:select-distinct-on`, be a set operation, or be a VALUES query. A VALUES query takes vector rows only; name the columns with `:columns` on the INSERT. INSERT, UPDATE and DELETE maps are rejected.
+
+SQLite needs a `:where` in the SELECT before `:on-conflict` (its parser reads `ON` as a join otherwise). Postgres accepts it without one.
+
+```phel
+{:insert-into :archive
+ :columns     [:id :name]
+ :query       {:select [:id :name] :from [:users] :where [:< :created_at "2020-01-01"]}}
+;; INSERT INTO archive (id, name) SELECT id, name FROM users WHERE created_at < ?
+```
+
 ### `:on-conflict` (Postgres)
 
 Target shapes:
@@ -308,7 +323,7 @@ Malformed input throws `InvalidArgumentException`. The message names the problem
 - WHERE: an unknown operator, a wrong argument count, a body that is not a vector, an empty `:in` list, an untagged vector as an operand.
 - A bad order direction or nulls modifier, a bad lock mode, a negative or non-integer `:limit` or `:offset`.
 - A malformed CTE, `:select-distinct-on` map, `[:raw ...]`, alias, `:case`, window spec or frame token.
-- INSERT: missing `:insert-into` or `:values`, mixed, empty or ragged rows, a row width that differs from `:columns`, a map key missing from `:columns`.
+- INSERT: missing `:insert-into`, neither `:values` nor `:query`, both of them, a `:query` that is not a map, an INSERT/UPDATE/DELETE query, a query without a select clause, a VALUES `:query` with map rows, mixed, empty or ragged rows, a row width that differs from `:columns`, a map key missing from `:columns`.
 - Upsert: a key without `:on-conflict`, `:on-conflict` without `:do-nothing` or `:do-update-set`, both `:do-nothing` and `:do-update-set`, both `:on-conflict` and `:on-duplicate-key-update`.
 - UPDATE without `:set`, an empty or non-map `:set` or `:on-duplicate-key-update`.
 - An empty `[:using]`.

@@ -57,6 +57,7 @@ Each kind has its own permitted clauses. Mixing them raises `InvalidArgumentExce
 | Subqueries anywhere                                 | yes       |
 | Raw SQL escape hatch `[:raw "..."]`                 | yes       |
 | INSERT (vector rows or map rows)                    | yes       |
+| INSERT ... SELECT (`:query`)                        | yes       |
 | INSERT ON CONFLICT (Postgres)                       | yes       |
 | INSERT ON DUPLICATE KEY UPDATE (MySQL)              | yes       |
 | UPDATE                                              | yes       |

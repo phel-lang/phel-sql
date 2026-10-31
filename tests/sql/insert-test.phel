@@ -69,3 +69,40 @@
 (deftest test-insert-map-rows-namespaced-and-dotted-keys-match-one-column
   (is (= ["INSERT INTO t (b.x) VALUES (?), (?)" [1 2]]
          (sql/format {:insert-into :t :columns [:b.x] :values [{:b/x 1} {:b.x 2}]}))))
+
+;; ---- INSERT ... SELECT ----
+
+(deftest test-insert-select-query
+  (is (= ["INSERT INTO archive SELECT id, name FROM users WHERE created_at < ?" ["2020-01-01"]]
+         (sql/format {:insert-into :archive
+                      :query {:select [:id :name] :from [:users]
+                              :where [:< :created_at "2020-01-01"]}}))))
+
+(deftest test-insert-select-query-with-columns
+  (is (= ["INSERT INTO archive (id, name) SELECT id, name FROM users WHERE created_at < ?" ["2020-01-01"]]
+         (sql/format {:insert-into :archive :columns [:id :name]
+                      :query {:select [:id :name] :from [:users]
+                              :where [:< :created_at "2020-01-01"]}}))))
+
+(deftest test-insert-select-set-op-query
+  (is (= ["INSERT INTO t (id) (SELECT id FROM a WHERE x = ?) UNION (SELECT id FROM b WHERE y = ?)" [1 2]]
+         (sql/format {:insert-into :t :columns [:id]
+                      :query {:union [{:select [:id] :from [:a] :where [:= :x 1]}
+                                      {:select [:id] :from [:b] :where [:= :y 2]}]}}))))
+
+(deftest test-insert-select-values-query
+  (is (= ["INSERT INTO t (a, b) VALUES (?, ?), (?, ?)" [1 2 3 4]]
+         (sql/format {:insert-into :t :columns [:a :b]
+                      :query {:values [[1 2] [3 4]]}}))))
+
+(deftest test-insert-select-with-cte
+  (is (= ["WITH recent AS (SELECT id FROM users WHERE age > ?) INSERT INTO archive (id) SELECT id FROM recent WHERE id < ?" [18 100]]
+         (sql/format {:with [[:recent {:select [:id] :from [:users] :where [:> :age 18]}]]
+                      :insert-into :archive :columns [:id]
+                      :query {:select [:id] :from [:recent] :where [:< :id 100]}}))))
+
+(deftest test-insert-select-returning
+  (is (= ["INSERT INTO archive (id) SELECT id FROM users WHERE age > ? RETURNING id" [18]]
+         (sql/format {:insert-into :archive :columns [:id]
+                      :query {:select [:id] :from [:users] :where [:> :age 18]}
+                      :returning [:id]}))))

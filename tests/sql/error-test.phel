@@ -225,3 +225,31 @@
 
 (deftest test-values-still-rejects-limit
   (is (thrown? \InvalidArgumentException (sql/format {:values [[1 2]] :limit 1}))))
+
+(deftest test-rejects-insert-with-values-and-query
+  (is (thrown-with-msg? \InvalidArgumentException ":values and :query are mutually exclusive, got both: [[1]] and {:select [:a]}"
+                        (sql/format {:insert-into :t :values [[1]] :query {:select [:a]}}))))
+
+(deftest test-rejects-insert-without-values-or-query
+  (is (thrown-with-msg? \InvalidArgumentException "insert statement requires :values or :query"
+                        (sql/format {:insert-into :t :columns [:a]}))))
+
+(deftest test-rejects-insert-query-not-a-map
+  (is (thrown-with-msg? \InvalidArgumentException ":query expects a map, got: [:select :a]"
+                        (sql/format {:insert-into :t :query [:select :a]}))))
+
+(deftest test-rejects-insert-query-that-is-an-insert
+  (is (thrown-with-msg? \InvalidArgumentException ":query expects a SELECT, VALUES or set operation, got: {:insert-into :u, :values [[1]]}"
+                        (sql/format {:insert-into :t :query {:insert-into :u :values [[1]]}}))))
+
+(deftest test-rejects-insert-query-without-select
+  (is (thrown-with-msg? \InvalidArgumentException ":query expects a SELECT, VALUES or set operation, got: {:from [:u]}"
+                        (sql/format {:insert-into :t :query {:from [:u]}}))))
+
+(deftest test-rejects-insert-query-empty-map
+  (is (thrown-with-msg? \InvalidArgumentException ":query expects a SELECT, VALUES or set operation, got: {}"
+                        (sql/format {:insert-into :t :query {}}))))
+
+(deftest test-rejects-insert-query-values-with-map-rows
+  (is (thrown-with-msg? \InvalidArgumentException ":query VALUES rows must be vectors (use :columns to name them), got: {:values [{:a 1}]}"
+                        (sql/format {:insert-into :t :query {:values [{:a 1}]}}))))
