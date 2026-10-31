@@ -37,3 +37,15 @@
 (deftest test-select-accepts-common-identifier-shapes
   (is (= ["SELECT id, user_id, users.id, t.col, t.*, *, _x1, $1 FROM t" []]
          (sql/format {:select [:id :user_id :users/id :t.col :t.* :* :_x1 :$1] :from [:t]}))))
+
+(deftest test-select-accepts-lazy-seq
+  (is (= ["SELECT id, name FROM t" []]
+         (sql/format {:select (map keyword ["id" "name"]) :from [:t]}))))
+
+(deftest test-from-and-group-by-accept-lists
+  (is (= ["SELECT id FROM t GROUP BY id" []]
+         (sql/format {:select [:id] :from (list :t) :group-by (list :id)}))))
+
+(deftest test-select-accepts-non-ascii-identifier
+  (is (= ["SELECT café FROM t" []]
+         (sql/format {:select [:café] :from [:t]}))))
