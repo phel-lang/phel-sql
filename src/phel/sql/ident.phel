@@ -7,7 +7,7 @@
 
 (def- identifier-segment "(?:[\\p{L}_$][\\p{L}\\p{N}_$]*|[0-9]+|\\*)")
 
-(def- identifier-pattern (str "/^" identifier-segment "(?:\\." identifier-segment ")*$/u"))
+(def- identifier-pattern (str "/^" identifier-segment "(?:\\." identifier-segment ")*$/Du"))
 
 (defn- check-identifier!
   "Throws unless every dot-separated part of `text` is a plain name, a number or `*`."
