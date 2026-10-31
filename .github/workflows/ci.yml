@@ -35,5 +35,11 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --no-ansi --no-progress
 
+      - name: Check formatting
+        run: composer format:check
+
       - name: Run phel tests
         run: composer test
+
+      - name: Smoke test compiled build
+        run: composer smoke
