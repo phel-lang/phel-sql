@@ -14,10 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `:window` clause for named windows, `[:over expr :name]` to use one, and a `:window` key in window specs to extend one (#50)
 - `[:rollup ...]`, `[:cube ...]` and `[:grouping-sets ...]` are accepted as `:group-by` items (#49)
 
-### Changed
-
-- `[:rollup x]` and `[:cube x]` no longer mean an alias outside `:group-by`; they throw. Use a string name such as `["rollup" :r]` for an alias (#49)
-
 ### Fixed
 
 - Move sources to `src/phel/` so the compiled `out/` tree loads the sub-files. `phel build` followed by `require "out/index.php"` no longer throws `Cannot locate sql/util` (#2).
@@ -34,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `[:rollup x]` and `[:cube x]` no longer mean an alias outside `:group-by`; they throw. Use a string name such as `["rollup" :r]` for an alias (#49)
 - `sql/format` is faster: wide map-row INSERTs about 2.2x, typical SELECTs about 18%.
 - Docs list every identifier position that renders a string verbatim, including `:set` keys, function names, cast types and aliases (#17)
 - The README links to the list of identifier positions that render a string verbatim (#17)
