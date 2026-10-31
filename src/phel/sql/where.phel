@@ -37,9 +37,12 @@
 (defn- emit-logical [joiner clauses]
   (when (empty? clauses)
     (bad-arg (str joiner " expects at least one clause")))
-  (let [parts (map emit-where clauses)
-        sqls  (map (fn [[s _]] (str "(" s ")")) parts)]
-    [(str/join (str " " joiner " ") sqls) (params-of parts)]))
+  (let [parts (filter some? (map emit-where-or-nil clauses))]
+    (case (count parts)
+      0 nil
+      1 (first parts)
+      (let [sqls (map (fn [[s _]] (str "(" s ")")) parts)]
+        [(str/join (str " " joiner " ") sqls) (params-of parts)]))))
 
 (defn- emit-in [args negate?]
   (let [[col vs]         args
@@ -96,7 +99,7 @@
       (bad-arg (str "where operator " (show op) " expects " expected
                     " argument(s), got: " (count args))))))
 
-(defn- emit-where [clause]
+(defn- emit-where-body [clause]
   (when-not (vector? clause)
     (bad-arg (str "where clause must be a vector, got: " (show clause))))
   (let [[op & args] clause]
@@ -116,3 +119,14 @@
       (if (contains? binary-ops op)
         (emit-comparison op args)
         (bad-arg (str "Unknown where operator: " (show op)))))))
+
+(defn- emit-where-or-nil
+  "Like `emit-where`, but a nil clause, or a logical clause whose items are all
+   nil, yields nil. Only :and / :or items and the WHERE / HAVING clauses use it."
+  [clause]
+  (when-not (nil? clause)
+    (emit-where-body clause)))
+
+(defn- emit-where [clause]
+  (or (emit-where-body clause)
+      (bad-arg "where clause is empty: every item is nil")))

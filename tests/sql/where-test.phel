@@ -150,3 +150,70 @@
 (deftest test-nil-with-other-operators-stays-a-parameter
   (is (= ["SELECT id FROM t WHERE a < ?" [nil]]
          (sql/format {:select [:id] :from [:t] :where [:< :a nil]}))))
+
+;; ---- nil items inside :and / :or ----
+
+(deftest test-and-skips-nil-items
+  (is (= ["SELECT id FROM t WHERE (a = ?) AND (b >= ?)" ["x" 3]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:and [:= :a "x"] nil [:>= :b 3]]}))))
+
+(deftest test-or-skips-nil-items
+  (is (= ["SELECT id FROM t WHERE (a = ?) OR (b = ?)" [1 2]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:or nil [:= :a 1] nil [:= :b 2]]}))))
+
+(deftest test-nested-logical-skips-nil-items
+  (is (= ["SELECT id FROM t WHERE (a = ?) AND ((b = ?) OR (c = ?))" [1 2 3]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:and [:= :a 1] nil
+                              [:or [:= :b 2] nil [:= :c 3]]]}))))
+
+(deftest test-nested-all-nil-logical-is-skipped
+  (is (= ["SELECT id FROM t WHERE (a = ?) AND (b = ?)" [1 2]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:and [:= :a 1] [:or nil nil] [:= :b 2]]}))))
+
+(deftest test-and-with-one-remaining-item-has-no-parentheses
+  (is (= ["SELECT id FROM t WHERE a = ?" [1]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:and nil [:= :a 1] nil]}))))
+
+(deftest test-single-remaining-or-inside-and-keeps-precedence
+  (is (= ["SELECT id FROM t WHERE (a = ?) AND ((b = ?) OR (c = ?))" [1 2 3]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:and [:= :a 1]
+                              [:and nil [:or [:= :b 2] [:= :c 3]]]]}))))
+
+(deftest test-params-keep-order-around-nil-items
+  (is (= ["SELECT id FROM t WHERE (a = ?) AND (b IN (?, ?)) AND (c = ?)" [1 2 3 4]]
+         (sql/format {:select [:id] :from [:t]
+                      :where [:and nil [:= :a 1] nil [:in :b [2 3]] nil [:= :c 4]]}))))
+
+(deftest test-where-all-nil-is-omitted
+  (is (= ["SELECT id FROM t" []]
+         (sql/format {:select [:id] :from [:t] :where [:and nil nil]}))))
+
+(deftest test-where-nil-is-omitted
+  (is (= ["SELECT id FROM t" []]
+         (sql/format {:select [:id] :from [:t] :where nil}))))
+
+(deftest test-where-nil-is-omitted-before-later-clauses
+  (is (= ["SELECT id FROM t ORDER BY id" []]
+         (sql/format {:select [:id] :from [:t] :where nil :order-by [:id]}))))
+
+(deftest test-having-nil-is-omitted
+  (is (= ["SELECT a FROM t GROUP BY a" []]
+         (sql/format {:select [:a] :from [:t] :group-by [:a] :having nil}))))
+
+(deftest test-having-all-nil-is-omitted
+  (is (= ["SELECT a FROM t GROUP BY a" []]
+         (sql/format {:select [:a] :from [:t] :group-by [:a] :having [:or nil nil]}))))
+
+(deftest test-update-without-where-still-works
+  (is (= ["UPDATE t SET a = ?" [1]]
+         (sql/format {:update :t :set {:a 1}}))))
+
+(deftest test-delete-without-where-still-works
+  (is (= ["DELETE FROM t" []]
+         (sql/format {:delete-from :t}))))

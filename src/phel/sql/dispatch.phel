@@ -40,7 +40,7 @@
    :update          emit-update
    :set             emit-set
    :from            emit-from
-   :where           emit-where-clause
+   :where           emit-update-where-clause
    :order-by        emit-order-by
    :limit           emit-limit
    :returning       emit-returning})
@@ -52,7 +52,7 @@
   {:with            emit-with
    :with-recursive  emit-with-recursive
    :delete-from     emit-delete-from
-   :where           emit-where-clause
+   :where           emit-delete-where-clause
    :order-by        emit-order-by
    :limit           emit-limit
    :returning       emit-returning})
@@ -106,7 +106,8 @@
 (defn- emit-ordered [query emitters clause-order allowed]
   (check-unknown! query allowed)
   (let [present (filter (fn [k] (contains? query k)) clause-order)
-        parts   (map (fn [k] ((get emitters k) (get query k))) present)]
+        parts   (remove (fn [p] (= omitted-clause p))
+                        (map (fn [k] ((get emitters k) (get query k))) present))]
     [(str/join " " (sqls-of parts)) (vec (params-of parts))]))
 
 (defn- emit-select-stmt [q]
