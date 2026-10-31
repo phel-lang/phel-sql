@@ -118,22 +118,42 @@
 (defn- emit-delete-stmt [q] (emit-ordered q delete-emitters delete-order delete-allowed))
 
 (def- insert-allowed
-  #{:with :with-recursive :insert-into :columns :values :returning
+  #{:with :with-recursive :insert-into :columns :values :query :returning
     :on-conflict :on-conflict-where :do-nothing :do-update-set :do-update-where
     :on-duplicate-key-update})
+
+(defn- check-insert-source! [query]
+  (let [values? (contains? query :values)
+        query?  (contains? query :query)]
+    (when (and values? query?)
+      (bad-arg (str ":values and :query are mutually exclusive, got both: "
+                    (show (get query :values)) " and " (show (get query :query)))))
+    (when-not (or values? query?)
+      (bad-arg "insert statement requires :values or :query"))
+    (when (and query? (not (map? (get query :query))))
+      (bad-arg (str ":query expects a map, got: " (show (get query :query)))))))
+
+(defn- insert-source
+  "`{:source-sql :params :columns-sql}` for the `:values` rows or the `:query` subquery."
+  [query]
+  (if (contains? query :query)
+    (let [[sql params] (compile-query (get query :query))]
+      {:source-sql sql :params params :columns-sql nil})
+    (let [vs (normalise-values (get query :values) (get query :columns))]
+      {:source-sql (get vs :values-sql) :params (get vs :params) :columns-sql (get vs :columns-sql)})))
 
 (defn- emit-insert-stmt [query]
   (check-unknown! query insert-allowed)
   (when-not (contains? query :insert-into) (bad-arg "insert statement requires :insert-into"))
-  (when-not (contains? query :values)      (bad-arg "insert statement requires :values"))
+  (check-insert-source! query)
   (check-upsert-keys! query)
   (when (contains? query :columns) (non-empty-vector! :columns (get query :columns)))
   (when (and (contains? query :on-conflict) (contains? query :on-duplicate-key-update))
     (bad-arg ":on-conflict and :on-duplicate-key-update are mutually exclusive"))
-  (let [vs                (normalise-values (get query :values) (get query :columns))
+  (let [src               (insert-source query)
         columns-sql       (cond
                             (contains? query :columns) (first (emit-columns (get query :columns)))
-                            :else                      (get vs :columns-sql))
+                            :else                      (get src :columns-sql))
         head              (cond-> []
                                   (contains? query :with)           (conj (emit-with           (get query :with)))
                                   (contains? query :with-recursive) (conj (emit-with-recursive (get query :with-recursive))))
@@ -154,9 +174,9 @@
                                     (filter (fn [s] (not (empty? s)))
                                             [leading-sql
                                              columns-sql
-                                             (get vs :values-sql)
+                                             (get src :source-sql)
                                              tail-sql]))]
-    [all-sql (vec (concat leading-params (get vs :params) tail-params))]))
+    [all-sql (vec (concat leading-params (get src :params) tail-params))]))
 
 (defn- emit-values-stmt [query]
   (check-unknown! query #{:values})

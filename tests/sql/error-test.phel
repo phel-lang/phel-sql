@@ -225,3 +225,15 @@
 
 (deftest test-values-still-rejects-limit
   (is (thrown? \InvalidArgumentException (sql/format {:values [[1 2]] :limit 1}))))
+
+(deftest test-rejects-insert-with-values-and-query
+  (is (thrown-with-msg? \InvalidArgumentException ":values and :query are mutually exclusive, got both: [[1]] and {:select [:a]}"
+                        (sql/format {:insert-into :t :values [[1]] :query {:select [:a]}}))))
+
+(deftest test-rejects-insert-without-values-or-query
+  (is (thrown-with-msg? \InvalidArgumentException "insert statement requires :values or :query"
+                        (sql/format {:insert-into :t :columns [:a]}))))
+
+(deftest test-rejects-insert-query-not-a-map
+  (is (thrown-with-msg? \InvalidArgumentException ":query expects a map, got: [:select :a]"
+                        (sql/format {:insert-into :t :query [:select :a]}))))
