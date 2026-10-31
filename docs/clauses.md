@@ -6,7 +6,7 @@ Every clause emits SQL in a fixed order, regardless of map insertion order.
 - UPDATE order: `:with`, `:update`, `:set`, `:from`, `:where`, `:order-by`, `:limit`, `:returning`.
 - DELETE order: `:with`, `:delete-from`, `:where`, `:order-by`, `:limit`, `:returning`.
 - INSERT order: `:with`, `:insert-into`, `:columns`, `:values`, `:on-conflict` / `:on-duplicate-key-update`, `:returning`.
-- Top-level VALUES: `{:values [[...] ...]}` with optional `:with`, `:with-recursive`, `:order-by`, `:limit` and `:offset`.
+- Top-level VALUES: `{:values [[...] ...]}` with no other keys.
 - Set ops: `{:union [...]}` (and `:union-all`, `:intersect`, `:except`) with optional `:with`, `:with-recursive`, `:order-by`, `:limit` and `:offset`.
 
 Wherever a clause accepts an identifier or value it also accepts the [tagged expression forms](expressions.md) and subquery maps.
@@ -283,7 +283,7 @@ When `:values` is the only key, the result is a standalone `VALUES` expression.
 
 ## Set operations
 
-`:union`, `:union-all`, `:intersect` and `:except` take a vector of two or more queries. The outer map holds one of these keys, plus optionally `:with`, `:with-recursive`, `:order-by`, `:limit` and `:offset`. They come out in that order around the set operation, whatever the map order. Params follow the SQL order.
+`:union`, `:union-all`, `:intersect` and `:except` take a vector of two or more queries. The outer map holds one of these keys, plus optionally `:with`, `:with-recursive`, `:order-by`, `:limit` and `:offset`. They come out in that order around the set operation, whatever the map order. Params follow the SQL order. Use only one of `:with` and `:with-recursive`. On Postgres, `:order-by` on a set operation accepts output column names or positions, not expressions.
 
 ```phel
 {:union [{:select [:id] :from [:a]}
@@ -312,4 +312,4 @@ Malformed input throws `InvalidArgumentException`. The message names the problem
 - Upsert: a key without `:on-conflict`, `:on-conflict` without `:do-nothing` or `:do-update-set`, both `:do-nothing` and `:do-update-set`, both `:on-conflict` and `:on-duplicate-key-update`.
 - UPDATE without `:set`, an empty or non-map `:set` or `:on-duplicate-key-update`.
 - An empty `[:using]`.
-- A set operation with keys other than the wrapper clauses above (for example `:where`), or fewer than two queries.
+- A set operation with keys other than the wrapper clauses above (for example `:where`), both `:with` and `:with-recursive`, or fewer than two queries.
