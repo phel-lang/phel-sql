@@ -391,3 +391,17 @@
 (deftest test-join-on-all-nil-throws
   (is (thrown? \InvalidArgumentException
                (sql/format {:select [:id] :from [:a] :join [[:b] [:and nil]]}))))
+
+(deftest test-do-update-where-nil-throws
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "where clause must be a vector, got: nil"
+                        (sql/format {:insert-into :t :values [[1 "x"]] :columns [:a :b]
+                                     :on-conflict [:a] :do-update-set {:b "u"}
+                                     :do-update-where nil}))))
+
+(deftest test-do-update-where-and-nil-throws
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "where clause is empty: every item is nil"
+                        (sql/format {:insert-into :t :values [[1 "x"]] :columns [:a :b]
+                                     :on-conflict [:a] :do-update-set {:b "u"}
+                                     :do-update-where [:and nil]}))))

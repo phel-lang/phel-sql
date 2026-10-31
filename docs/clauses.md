@@ -117,6 +117,7 @@ Argument counts are checked. Binary operators, `:in` and `:not-in` take 2 argume
 ;; only age  => WHERE age >= ?
 ```
 
+- An `:or` whose items are all `nil` is dropped, which widens the result, while a `nil` inside a non-empty `:or` is skipped, which narrows it. HoneySQL behaves the same. Use `:and` for optional narrowing filters.
 - One remaining item renders without parentheses, because the parentheses only separate siblings.
 - A nested `:and` or `:or` whose items are all `nil` is skipped like a `nil`.
 - In SELECT, a `:where` or `:having` that is `nil`, or that ends up empty, is left out of the statement.

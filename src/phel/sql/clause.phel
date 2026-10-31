@@ -48,12 +48,15 @@
                     (non-empty-vector! :group-by cols))]
     [(str "GROUP BY " (str/join ", " (sqls-of parts))) (params-of parts)]))
 (defn- emit-returning       [cols] (emit-ident-list "RETURNING"       :returning       cols))
+(def- omitted-clause :omitted)
+
 (defn- emit-optional-where [prefix w]
-  (when-let [emitted (emit-where-or-nil w)]
-    (prefixed prefix emitted)))
+  (if-let [emitted (emit-where-or-nil w)]
+    (prefixed prefix emitted)
+    omitted-clause))
 
 (defn- emit-mutation-where [kind w]
-  (or (emit-optional-where "WHERE" w)
+  (or (when-let [emitted (emit-where-or-nil w)] (prefixed "WHERE" emitted))
       (bad-arg (str kind " statement has an empty :where; omit :where to " kind " every row"))))
 
 (defn- emit-where-clause    [w]    (emit-optional-where "WHERE" w))

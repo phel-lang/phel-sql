@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `[:rollup ...]`, `[:cube ...]` and `[:grouping-sets ...]` are accepted as `:group-by` items (#49)
 - `nil` items inside `:and` and `:or` are skipped, and a SELECT `:where` or `:having` that is `nil` or ends up empty is omitted, so optional filters work with `when`. An empty `:where` in UPDATE or DELETE throws (#42)
 
+### Changed
+
+- A single remaining item in `:and` or `:or` renders without parentheses (`a = ?`, not `(a = ?)`). The meaning is unchanged (#42)
+
 ### Fixed
 
 - Move sources to `src/phel/` so the compiled `out/` tree loads the sub-files. `phel build` followed by `require "out/index.php"` no longer throws `Cannot locate sql/util` (#2).
