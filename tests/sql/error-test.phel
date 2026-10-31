@@ -289,3 +289,19 @@
 (deftest test-rejects-window-spec-bad-extended-name
   (is (thrown? \InvalidArgumentException
                (sql/format {:select [[:over [:fn :rank] {:window 42}]] :from [:t]}))))
+
+(deftest test-window-entry-reports-bad-name-first
+  (is (thrown-with-msg? \InvalidArgumentException "window name must be a keyword or string, got: 1"
+                        (sql/format {:select [:id] :from [:t] :window [[1 :x]]}))))
+
+(deftest test-window-entry-reports-bad-spec
+  (is (thrown-with-msg? \InvalidArgumentException ":window expects a window-spec map, got: :x"
+                        (sql/format {:select [:id] :from [:t] :window [[:w :x]]}))))
+
+(deftest test-rejects-over-extra-argument
+  (is (thrown-with-msg? \InvalidArgumentException "over expects [:over expr window], got: [:over [:fn :rank] :w :x]"
+                        (sql/format {:select [[:over [:fn :rank] :w :x]] :from [:t]}))))
+
+(deftest test-rejects-over-missing-window
+  (is (thrown-with-msg? \InvalidArgumentException "over expects [:over expr window], got: [:over [:fn :rank]]"
+                        (sql/format {:select [[:over [:fn :rank]]] :from [:t]}))))

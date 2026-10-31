@@ -125,8 +125,11 @@
       (push! (emit-frame (get m :frame)) []))
     [(str/join " " (deref pieces)) (vec (deref params))]))
 
-(defn- emit-over [[_ x window-spec]]
-  (let [[e-sql e-params] (operand x)]
+(defn- emit-over [form]
+  (when-not (= 3 (count form))
+    (bad-arg (str "over expects [:over expr window], got: " (show form))))
+  (let [[_ x window-spec] form
+        [e-sql e-params]  (operand x)]
     (if (or (keyword? window-spec) (string? window-spec))
       [(str e-sql " OVER " (ident window-spec)) e-params]
       (let [[w-sql w-params] (emit-window-spec window-spec)]

@@ -19,11 +19,13 @@
 (defn- emit-named-window [pair]
   (when-not (and (vector? pair) (= 2 (count pair)))
     (bad-arg (str ":window entries must be [name spec] pairs, got: " (show pair))))
-  (let [[w-name spec] pair
-        [s p]         (emit-window-spec spec)]
+  (let [[w-name spec] pair]
     (when-not (or (keyword? w-name) (string? w-name))
       (bad-arg (str "window name must be a keyword or string, got: " (show w-name))))
-    [(str (ident w-name) " AS (" s ")") p]))
+    (when-not (map? spec)
+      (bad-arg (str ":window expects a window-spec map, got: " (show spec))))
+    (let [[s p] (emit-window-spec spec)]
+      [(str (ident w-name) " AS (" s ")") p])))
 
 (defn- emit-window [windows]
   (let [parts (map emit-named-window (non-empty-vector! :window windows))]

@@ -66,7 +66,7 @@ Window function. `expr` is any expression, usually `[:fn :row_number]` or `[:fn 
 
 ### Named windows
 
-A keyword or string as the second item renders `OVER name`. Define the window with the `:window` clause. The library does not check that the name exists.
+A keyword or string as the second item renders `OVER name`. Define the window with the `:window` clause. Window names are not checked against the `:window` clause. A spec that extends a window cannot set `:partition-by`; the database rejects it.
 
 ```phel
 {:select [[[:over [:fn :rank] :w] :r]]
