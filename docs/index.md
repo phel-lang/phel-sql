@@ -50,6 +50,7 @@ Each kind has its own permitted clauses. Mixing them raises `InvalidArgumentExce
 | FOR UPDATE / SHARE (+ NOWAIT / SKIP LOCKED)         | yes       |
 | RETURNING                                           | yes       |
 | Window functions (`:over` + frame DSL)              | yes       |
+| WINDOW clause and named windows (`:window`)        | yes       |
 | FILTER (WHERE ...)                                  | yes       |
 | Function calls (`:fn`)                              | yes       |
 | CAST                                                | yes       |

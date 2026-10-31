@@ -94,10 +94,15 @@
     (bad-arg ":frame expects a non-empty vector of tokens"))
   (str/join " " (map emit-frame-token tokens)))
 
+(defn- emit-window-name [x]
+  (when-not (or (keyword? x) (string? x))
+    (bad-arg (str "window name must be a keyword or string, got: " (show x))))
+  (ident x))
+
 (defn- emit-window-spec [m]
   (when-not (map? m)
     (bad-arg (str "over expects a window-spec map, got: " (show m))))
-  (let [allowed #{:partition-by :order-by :frame}
+  (let [allowed #{:window :partition-by :order-by :frame}
         unknown (filter (fn [k] (not (contains? allowed k))) (keys m))]
     (when (seq unknown)
       (bad-arg (str "Unknown window-spec key(s): " (str/join ", " (map name unknown))))))
@@ -106,6 +111,8 @@
         push!  (fn [s p]
                  (swap! pieces conj s)
                  (reset! params (concat (deref params) p)))]
+    (when (contains? m :window)
+      (push! (emit-window-name (get m :window)) []))
     (when (contains? m :partition-by)
       (let [cols  (get m :partition-by)
             parts (map ident+ (non-empty-vector! :partition-by cols))]
@@ -118,10 +125,15 @@
       (push! (emit-frame (get m :frame)) []))
     [(str/join " " (deref pieces)) (vec (deref params))]))
 
-(defn- emit-over [[_ x window-spec]]
-  (let [[e-sql e-params] (operand x)
-        [w-sql w-params] (emit-window-spec window-spec)]
-    [(str e-sql " OVER (" w-sql ")") (concat e-params w-params)]))
+(defn- emit-over [form]
+  (when-not (= 3 (count form))
+    (bad-arg (str "over expects [:over expr window], got: " (show form))))
+  (let [[_ x window-spec] form
+        [e-sql e-params]  (operand x)]
+    (if (or (keyword? window-spec) (string? window-spec))
+      [(str e-sql " OVER " (ident window-spec)) e-params]
+      (let [[w-sql w-params] (emit-window-spec window-spec)]
+        [(str e-sql " OVER (" w-sql ")") (concat e-params w-params)]))))
 
 (defn- emit-filter-expr [[_ x where]]
   (let [[e-sql e-params] (operand x)

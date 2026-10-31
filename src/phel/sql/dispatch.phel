@@ -19,6 +19,7 @@
    :where              emit-where-clause
    :group-by           emit-group-by
    :having             emit-having-clause
+   :window             emit-window
    :order-by           emit-order-by
    :limit              emit-limit
    :offset             emit-offset
@@ -29,7 +30,7 @@
   [:with :with-recursive
    :select :select-distinct :select-distinct-on
    :from :join :left-join :right-join :full-join :cross-join
-   :where :group-by :having
+   :where :group-by :having :window
    :order-by :limit :offset
    :for :returning])
 
