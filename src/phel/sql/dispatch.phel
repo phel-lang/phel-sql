@@ -122,6 +122,19 @@
     :on-conflict :on-conflict-where :do-nothing :do-update-set :do-update-where
     :on-duplicate-key-update})
 
+(defn- check-insert-query!
+  "`:query` must be a SELECT, set-op or VALUES query with vector rows."
+  [q]
+  (when-not (map? q)
+    (bad-arg (str ":query expects a map, got: " (show q))))
+  (case (statement-type q)
+    :set-op      nil
+    :values-only (when (some map? (get q :values))
+                   (bad-arg (str ":query VALUES rows must be vectors (use :columns to name them), got: " (show q))))
+    :select      (when-not (some (fn [k] (contains? q k)) [:select :select-distinct :select-distinct-on])
+                   (bad-arg (str ":query expects a SELECT, VALUES or set operation, got: " (show q))))
+    (bad-arg (str ":query expects a SELECT, VALUES or set operation, got: " (show q)))))
+
 (defn- check-insert-source! [query]
   (let [values? (contains? query :values)
         query?  (contains? query :query)]
@@ -130,8 +143,8 @@
                     (show (get query :values)) " and " (show (get query :query)))))
     (when-not (or values? query?)
       (bad-arg "insert statement requires :values or :query"))
-    (when (and query? (not (map? (get query :query))))
-      (bad-arg (str ":query expects a map, got: " (show (get query :query)))))))
+    (when query?
+      (check-insert-query! (get query :query)))))
 
 (defn- insert-source
   "`{:source-sql :params :columns-sql}` for the `:values` rows or the `:query` subquery."
