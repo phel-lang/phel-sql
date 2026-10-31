@@ -65,10 +65,10 @@ Each kind has its own permitted clauses. Mixing them raises `InvalidArgumentExce
 | DELETE                                              | yes       |
 | Top-level UNION / INTERSECT / EXCEPT                | yes       |
 | Top-level VALUES                                    | yes       |
+| GROUP BY ROLLUP / CUBE / GROUPING SETS              | yes       |
 | MERGE                                               | not yet   |
-| GROUPING SETS / CUBE / ROLLUP                       | not yet   |
 | TABLESAMPLE                                         | not yet   |
 | OFFSET ... FETCH (SQL standard form)                | not yet   |
 | Named parameters (`:foo`)                           | not yet   |
 
-Use `[:raw "..."]` for MERGE, grouping sets and dialect-specific JSON operators until they are supported.
+Use `[:raw "..."]` for MERGE and dialect-specific JSON operators until they are supported.

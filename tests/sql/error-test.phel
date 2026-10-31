@@ -305,3 +305,34 @@
 (deftest test-rejects-over-missing-window
   (is (thrown-with-msg? \InvalidArgumentException "over expects [:over expr window], got: [:over [:fn :rank]]"
                         (sql/format {:select [[:over [:fn :rank]]] :from [:t]}))))
+(deftest test-rejects-empty-rollup
+  (is (thrown-with-msg? \InvalidArgumentException ":rollup expects at least one column, got: [:rollup]"
+                        (sql/format {:select [:a] :from [:t] :group-by [[:rollup]]}))))
+
+(deftest test-rejects-empty-cube
+  (is (thrown-with-msg? \InvalidArgumentException ":cube expects at least one column, got: [:cube]"
+                        (sql/format {:select [:a] :from [:t] :group-by [[:cube]]}))))
+
+(deftest test-rejects-empty-grouping-sets
+  (is (thrown-with-msg? \InvalidArgumentException ":grouping-sets expects at least one set, got: [:grouping-sets]"
+                        (sql/format {:select [:a] :from [:t] :group-by [[:grouping-sets]]}))))
+
+(deftest test-rejects-non-vector-grouping-set
+  (is (thrown-with-msg? \InvalidArgumentException ":grouping-sets expects each set to be a vector, got: :a"
+                        (sql/format {:select [:a] :from [:t] :group-by [[:grouping-sets :a]]}))))
+
+(deftest test-rejects-nested-rollup
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:a] :from [:t] :group-by [[:rollup [:cube :a :b]]]}))))
+
+(deftest test-rejects-rollup-in-select
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:rollup :a]] :from [:t]}))))
+
+(deftest test-rejects-cube-in-where
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:a] :from [:t] :where [:= [:cube :a :b] 1]}))))
+
+(deftest test-rejects-grouping-sets-in-order-by
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:a] :from [:t] :order-by [[:grouping-sets [:a]]]}))))

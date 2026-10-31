@@ -19,3 +19,49 @@
                       :group-by [:dept]
                       :having [:and [:> [:raw "SUM(salary)"] 100000]
                                [:>= [:raw "COUNT(*)"] 5]]}))))
+
+(deftest test-group-by-rollup
+  (is (= ["SELECT region, city FROM sales GROUP BY ROLLUP (region, city)" []]
+         (sql/format {:select [:region :city] :from [:sales]
+                      :group-by [[:rollup :region :city]]}))))
+
+(deftest test-group-by-cube
+  (is (= ["SELECT region, city FROM sales GROUP BY CUBE (region, city)" []]
+         (sql/format {:select [:region :city] :from [:sales]
+                      :group-by [[:cube :region :city]]}))))
+
+(deftest test-group-by-grouping-sets
+  (is (= ["SELECT region, city FROM sales GROUP BY GROUPING SETS ((region, city), (region))" []]
+         (sql/format {:select [:region :city] :from [:sales]
+                      :group-by [[:grouping-sets [:region :city] [:region]]]}))))
+
+(deftest test-group-by-grouping-sets-empty-set
+  (is (= ["SELECT region FROM sales GROUP BY GROUPING SETS ((region), ())" []]
+         (sql/format {:select [:region] :from [:sales]
+                      :group-by [[:grouping-sets [:region] []]]}))))
+
+(deftest test-group-by-plain-column-then-rollup
+  (is (= ["SELECT country FROM sales GROUP BY country, ROLLUP (region, city)" []]
+         (sql/format {:select [:country] :from [:sales]
+                      :group-by [:country [:rollup :region :city]]}))))
+
+(deftest test-group-by-rollup-then-plain-column
+  (is (= ["SELECT country FROM sales GROUP BY ROLLUP (region), country" []]
+         (sql/format {:select [:country] :from [:sales]
+                      :group-by [[:rollup :region] :country]}))))
+
+(deftest test-group-by-rollup-binds-params-in-order
+  (is (= ["SELECT a FROM t GROUP BY ROLLUP (nullif(a, ?), b)" ["x"]]
+         (sql/format {:select [:a] :from [:t]
+                      :group-by [[:rollup [:fn :nullif :a "x"] :b]]}))))
+
+(deftest test-group-by-grouping-sets-binds-params-in-order
+  (is (= ["SELECT a FROM t GROUP BY GROUPING SETS ((nullif(a, ?)), (coalesce(b, ?)))" ["x" "y"]]
+         (sql/format {:select [:a] :from [:t]
+                      :group-by [[:grouping-sets [[:fn :nullif :a "x"]] [[:fn :coalesce :b "y"]]]]}))))
+
+(deftest test-group-by-rollup-with-having
+  (is (= ["SELECT region FROM t GROUP BY ROLLUP (region) HAVING COUNT(*) > ?" [1]]
+         (sql/format {:select [:region] :from [:t]
+                      :group-by [[:rollup :region]]
+                      :having [:> [:raw "COUNT(*)"] 1]}))))
