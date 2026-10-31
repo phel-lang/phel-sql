@@ -16,21 +16,21 @@ globs: src/**,tests/**
 
 Public functions (only `sql/format` and supporting public helpers) get:
 
-- `:doc` — what it does, in plain prose.
-- `:see-also` — related symbols as strings.
-- `:example` — inline usage example matching the actual return shape.
+- `:doc`: what it does, in plain prose.
+- `:see-also`: related symbols as strings.
+- `:example`: inline usage example matching the actual return shape.
 
 ## Comments
 
 - `;` for line comments. `;;` for standalone, `;` for trailing.
-- Use section banners (`;; ====`) sparingly — the existing ones mark forward-decl blocks and sub-file load points.
+- Use section banners (`;; ====`) sparingly: the existing ones mark forward-decl blocks and sub-file load points.
 
 ## Semantics
 
-- Pure functions only — no I/O, no PDO, no globals.
+- Pure functions only: no I/O, no PDO, no globals.
 - Every emitter returns `[sql params]`. Tuple discipline is load-bearing.
 - Prefer threading (`->`, `->>`) and `case` for dispatch where it improves clarity.
-- Use `defstruct` for data, not maps-of-keywords, when shape is fixed (currently not used — keep an eye out).
+- Use `defstruct` for data, not maps-of-keywords, when shape is fixed (currently not used: keep an eye out).
 
 ## Multi-file namespace
 

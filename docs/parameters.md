@@ -109,15 +109,15 @@ Any place that accepts an identifier or operand also accepts a map. The map is c
 ;;     ["spam"]]
 ```
 
-## NULL
+## nil
 
-`null` is not a placeholder value. Use `[:is-null :col]` and `[:is-not-null :col]` instead. Binding `null` through `?` is allowed but rarely does what you want under SQL three-valued logic.
+`[:= :col nil]` compiles to `col IS NULL` and `[:!= :col nil]` to `col IS NOT NULL`, because `col = NULL` never matches in SQL. You can also write `[:is-null :col]` and `[:is-not-null :col]`. With other operators, such as `:<` or `:like`, a `nil` is bound as a parameter. In `:values` and `:set`, `nil` is bound and stored as NULL.
 
 ## Tagged expression forms
 
-Six forms (plus `[:raw "..."]`) cover everything from function calls to window expressions. They compose freely: an `:over` can wrap a `:filter` that wraps a `:fn`, a `:case` can sit inside an `:in`, a `:cast` can sit inside a `:fn` argument. See [expressions.md](expressions.md) for the full reference.
+Six forms plus `[:raw "..."]` cover function calls, casts, CASE, window functions, FILTER and LATERAL. They nest freely. See [expressions.md](expressions.md) for the reference.
 
-Quick sketch:
+A quick look:
 
 ```phel
 [:fn :count :*]
@@ -140,7 +140,3 @@ Quick sketch:
 ```
 
 A raw fragment is unvalidated. If you put untrusted data in it, you write a SQL injection. Bind values with `?` instead.
-
-## Future: named parameters
-
-Positional `?` is the MVP. Named parameters (`:foo`) will land alongside the PDO bridge library when it ships.

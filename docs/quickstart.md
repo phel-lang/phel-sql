@@ -50,15 +50,18 @@ composer require phel-lang/phel-sql
 
 ## Run it against a database
 
-The library returns data. Execution is your call:
+`sql/format` returns data and never runs it. Hand the tuple to your driver:
 
 ```php
-[$sql, $params] = $compiled;          // from sql/format
+[$sql, $params] = $compiled;   // the result of sql/format
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 ```
 
+Malformed input throws `InvalidArgumentException` with the offending value in the message, so a typo fails at build time instead of at the database.
+
 ## Next
 
 - [Clauses](clauses.md) for the full reference.
-- [Parameters](parameters.md) for how values, identifiers, and subqueries interact.
+- [Parameters](parameters.md) for how values, identifiers and subqueries interact.
+- [Expressions](expressions.md) for functions, CASE, window functions and FILTER.
