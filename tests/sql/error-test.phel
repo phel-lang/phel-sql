@@ -503,9 +503,10 @@
   (is (thrown-with-msg? \InvalidArgumentException
                         "in :where: Unknown where operator: :on (did you mean :in?)"
                         (sql/format {:select [:id] :from [:t] :where [:on :a 1]}))))
+
 (deftest test-rejects-arithmetic-operator-with-one-operand
   (is (thrown-with-msg? \InvalidArgumentException
-                        ":+ expects at least 2 operands, got 1: [:+ :a]"
+                        "in :select: :+ expects at least 2 operands, got 1: [:+ :a]"
                         (sql/format {:select [[:+ :a]]}))))
 
 (deftest test-rejects-arithmetic-operator-without-operands
@@ -513,10 +514,20 @@
 
 (deftest test-rejects-json-operator-with-one-operand
   (is (thrown-with-msg? \InvalidArgumentException
-                        ":->> expects exactly 2 operands, got 1: [:->> :data]"
+                        "in :select: :->> expects exactly 2 operands, got 1: [:->> :data]"
                         (sql/format {:select [[:->> :data]]}))))
 
 (deftest test-rejects-json-operator-with-three-operands
   (is (thrown-with-msg? \InvalidArgumentException
-                        ":-> expects exactly 2 operands, got 3: [:-> :data \"a\" \"b\"]"
+                        "in :select: :-> expects exactly 2 operands, got 3: [:-> :data \"a\" \"b\"]"
                         (sql/format {:select [[:-> :data "a" "b"]]}))))
+
+(deftest test-one-letter-expression-tag-does-not-suggest-operator
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :where: Unknown expression tag: :x"
+                        (sql/format {:select [:id] :from [:t] :where [:= :a [:x 1]]}))))
+
+(deftest test-rejects-json-contains-condition-with-one-argument
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :where: where operator :json-contains expects 2 argument(s), got: 1"
+                        (sql/format {:select [:id] :from [:t] :where [:json-contains :doc]}))))

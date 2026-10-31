@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Columns named like an operator tag (`div`, `%`, `*`, `+`, `-`, `||`) can no longer be aliased or ordered as `[:div :d]` or `[:div :desc]`. Use a string name: `["div" :d]` (#47)
 - Error messages name the clause they came from (`in :join: ...`) and suggest the closest clause, WHERE operator or expression tag, or the snake_case spelling of a kebab-case identifier. The message text changed, so callers matching on it must update. The exception class is still `InvalidArgumentException` (#43)
 - A single remaining item in `:and` or `:or` renders without parentheses (`a = ?`, not `(a = ?)`). The meaning is unchanged (#42)
 

@@ -212,3 +212,16 @@
 (deftest test-json-inside-concat
   (is (= ["SELECT (data ->> ?) || ? FROM t" ["a" "!"]]
          (sql/format {:select [[:|| [:->> :data "a"] "!"]] :from [:t]}))))
+
+(deftest test-json-contains-as-where-condition
+  (is (= ["SELECT * FROM t WHERE doc @> CAST(? AS jsonb)" ["{}"]]
+         (sql/format {:select [:*] :from [:t] :where [:json-contains :doc [:cast "{}" :jsonb]]}))))
+
+(deftest test-json-contained-by-as-where-condition
+  (is (= ["SELECT * FROM t WHERE doc <@ ?" ["{}"]]
+         (sql/format {:select [:*] :from [:t] :where [:json-contained-by :doc "{}"]}))))
+
+(deftest test-json-contains-inside-and-and-having
+  (is (= ["SELECT a FROM t GROUP BY a HAVING (doc @> ?) AND (n > ?)" ["{}" 1]]
+         (sql/format {:select [:a] :from [:t] :group-by [:a]
+                      :having [:and [:json-contains :doc "{}"] [:> :n 1]]}))))

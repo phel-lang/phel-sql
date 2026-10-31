@@ -197,6 +197,6 @@
     (subquery? x) (let [[s p] (compile-query x)] [(str "(" s ")") p])
     (vector? x)   (bad-arg (if (keyword? (first x))
                              (str "Unknown expression tag: " (show (first x))
-                                  (did-you-mean (first x) (sort expr-tags)))
+                                  (did-you-mean (first x) (filter (fn [t] (> (php/strlen (name t)) 2)) (sort expr-tags))))
                              (str "Unsupported operand, use [:raw ...] or :in for lists: " (show x))))
     :else         ["?" [x]]))

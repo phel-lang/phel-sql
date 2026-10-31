@@ -167,24 +167,37 @@ Arithmetic and JSON operators are tagged forms. Operands follow the usual rules:
 
 Arithmetic tags take two or more operands: `:+ :- :* :div :% :||`. `[:+ :a :b :c]` renders `a + b + c`.
 
-JSON tags take exactly two operands (Postgres):
+On MySQL, `||` is logical OR unless the `PIPES_AS_CONCAT` mode is on. Use `[:fn :concat ...]` there.
 
-| Tag                | SQL  |
-|--------------------|------|
-| `:->`              | `->` |
-| `:->>`             | `->>` |
-| `:json-path`       | `#>` |
-| `:json-path-text`  | `#>>` |
-| `:json-contains`   | `@>` |
-| `:json-contained-by` | `<@` |
+Postgres cannot infer a type when every operand is a bound parameter: `[:+ 1 2]` fails with "operator is not unique". Give one operand a type with `[:cast x :int]` or use a column.
+
+JSON tags take exactly two operands:
+
+| Tag                  | SQL   | Databases                           |
+|----------------------|-------|-------------------------------------|
+| `:->`                | `->`  | Postgres, SQLite 3.38+, MySQL       |
+| `:->>`               | `->>` | Postgres, SQLite 3.38+, MySQL       |
+| `:json-path`         | `#>`  | Postgres only                       |
+| `:json-path-text`    | `#>>` | Postgres only                       |
+| `:json-contains`     | `@>`  | Postgres only                       |
+| `:json-contained-by` | `<@`  | Postgres only                       |
 
 The Phel reader cannot read the keywords `:/`, `:@>`, `:<@`, `:#>` and `:#>>`, so those operators have the names `:div`, `:json-contains`, `:json-contained-by`, `:json-path` and `:json-path-text`.
+
+The operator tags are reserved as the first element of a vector. A column named `div`, `%`, `*`, `+`, `-` or `||` can no longer be written `[:div :d]` or `[:div :desc]`. Use a string for the name: `["div" :d]`.
 
 The operators work wherever an operand or identifier is accepted:
 
 ```phel
 {:where [:= [:->> :data "name"] "x"]}
 ;; WHERE data ->> ? = ?
+```
+
+`:json-contains` and `:json-contained-by` also work as a whole WHERE or HAVING condition, including inside `:and` and `:or`:
+
+```phel
+{:where [:json-contains :doc [:cast "{}" :jsonb]]}
+;; WHERE doc @> CAST(? AS jsonb)
 ```
 
 Operators that contain `?` (the Postgres key-exists family `?`, `?|`, `?&`) are not supported. PDO reads every `?` as a placeholder. Use `[:fn :jsonb_exists :data "key"]` instead.

@@ -91,7 +91,8 @@
    :between 3 :not-between 3
    :is-null 1 :is-not-null 1
    :not 1
-   :exists 1 :not-exists 1})
+   :exists 1 :not-exists 1
+   :json-contains 2 :json-contained-by 2})
 
 (defn- check-arity! [op args]
   (let [expected (if (contains? binary-ops op) 2 (get special-op-arity op))]
@@ -108,17 +109,19 @@
   (let [[op & args] clause]
     (check-arity! op args)
     (case op
-      :and         (emit-logical "AND" args)
-      :or          (emit-logical "OR" args)
-      :not         (emit-not args)
-      :in          (emit-in args false)
-      :not-in      (emit-in args true)
-      :between     (emit-between args false)
-      :not-between (emit-between args true)
-      :is-null     (emit-null (first args) false)
-      :is-not-null (emit-null (first args) true)
-      :exists      (emit-exists args false)
-      :not-exists  (emit-exists args true)
+      :and               (emit-logical "AND" args)
+      :or                (emit-logical "OR" args)
+      :not               (emit-not args)
+      :in                (emit-in args false)
+      :not-in            (emit-in args true)
+      :between           (emit-between args false)
+      :not-between       (emit-between args true)
+      :is-null           (emit-null (first args) false)
+      :is-not-null       (emit-null (first args) true)
+      :exists            (emit-exists args false)
+      :not-exists        (emit-exists args true)
+      :json-contains     (emit-tagged clause)
+      :json-contained-by (emit-tagged clause)
       (if (contains? binary-ops op)
         (emit-comparison op args)
         (bad-arg (str "Unknown where operator: " (show op)
