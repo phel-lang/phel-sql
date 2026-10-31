@@ -6,7 +6,7 @@ Turn a Phel map into a `[sql params]` tuple. Pure functions, no I/O, no database
 
 - **[Quickstart](quickstart.md)**: three queries, end to end.
 - **[Clauses](clauses.md)**: every clause, every operator, every error.
-- **[Expressions](expressions.md)**: tagged forms (`:fn`, `:cast`, `:case`, `:over`, `:filter`, `:lateral`, `:raw`).
+- **[Expressions](expressions.md)**: tagged forms (`:fn`, `:cast`, `:case`, `:over`, `:filter`, `:lateral`, `:raw`) and arithmetic and JSON operators.
 - **[Parameters](parameters.md)**: identifier rules, values, subqueries, raw fragments.
 - **[Cookbook](cookbook.md)**: dynamic filters, pagination, upsert, CTE, window ranking, running a query with PDO, FAQ.
 - **[Contributing](contributing.md)**: repo layout, tests, how to add a clause or operator.
@@ -44,6 +44,7 @@ Each kind has its own permitted clauses. Mixing them raises `InvalidArgumentExce
 | Join ON clause                                      | yes       |
 | Join USING clause                                   | yes       |
 | LATERAL joins / from                                | yes       |
+| Arithmetic and Postgres JSON operators              | yes       |
 | WHERE: 21 operators incl. EXISTS, NOT IN, ILIKE     | yes       |
 | GROUP BY, HAVING                                    | yes       |
 | ORDER BY (ASC / DESC / NULLS FIRST / NULLS LAST)    | yes       |

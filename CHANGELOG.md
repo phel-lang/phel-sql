@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Cookbook with dynamic filters, pagination, upsert, CTE, window ranking, a PDO example and an FAQ; `sql/format` docstring has a multi-statement example and `:see-also` (#44)
+- Operator expressions: `:+ :- :* :div :% :||` take two or more operands, and the JSON tags `:->`, `:->>`, `:json-path`, `:json-path-text`, `:json-contains` and `:json-contained-by` take exactly two. Nested operators are wrapped in parentheses (#47)
 - Set operations accept `:with`, `:with-recursive`, `:order-by`, `:limit` and `:offset`; other extra keys still throw (#46)
 - INSERT ... SELECT: `:query` takes a SELECT, VALUES or set operation query in place of `:values`, and works with `:with`, upserts and `:returning` (#45)
 - `:window` clause for named windows, `[:over expr :name]` to use one, and a `:window` key in window specs to extend one (#50)
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Columns named like an operator tag (`div`, `%`, `*`, `+`, `-`, `||`) can no longer be aliased or ordered as `[:div :d]` or `[:div :desc]`. Use a string name: `["div" :d]` (#47)
 - Error messages name the clause they came from (`in :join: ...`) and suggest the closest clause, WHERE operator or expression tag, or the snake_case spelling of a kebab-case identifier. The message text changed, so callers matching on it must update. The exception class is still `InvalidArgumentException` (#43)
 - A single remaining item in `:and` or `:or` renders without parentheses (`a = ?`, not `(a = ?)`). The meaning is unchanged (#42)
 

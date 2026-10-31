@@ -151,7 +151,24 @@
     (bad-arg (str "raw expects [:raw \"SQL\"], got: " (show x))))
   [(second x) []])
 
-(defn- emit-tagged [x]
+(defn- operator-operand
+  "Operand of an operator; a nested operator is wrapped so precedence is explicit."
+  [x]
+  (let [[s p] (operand x)]
+    [(if (operator-form? x) (str "(" s ")") s) p]))
+
+(defn- emit-operator [x]
+  (let [tag   (first x)
+        args  (rest x)
+        n     (count args)
+        json? (contains? json-operators tag)]
+    (when (if json? (not= 2 n) (< n 2))
+      (bad-arg (str (show tag) " expects " (if json? "exactly 2" "at least 2")
+                    " operands, got " n ": " (show x))))
+    (let [parts (map operator-operand args)]
+      [(str/join (str " " (get operator-tags tag) " ") (sqls-of parts)) (params-of parts)])))
+
+(defn- emit-tagged-form [x]
   (case (first x)
     :raw     (emit-raw x)
     :fn      (emit-fn-call x)
@@ -160,6 +177,11 @@
     :over    (emit-over x)
     :filter  (emit-filter-expr x)
     :lateral (emit-lateral x)))
+
+(defn- emit-tagged [x]
+  (if (contains? operator-tags (first x))
+    (emit-operator x)
+    (emit-tagged-form x)))
 
 (defn- operand
   "Used in value positions (where RHS, set RHS, fn arg, etc):
@@ -175,6 +197,6 @@
     (subquery? x) (let [[s p] (compile-query x)] [(str "(" s ")") p])
     (vector? x)   (bad-arg (if (keyword? (first x))
                              (str "Unknown expression tag: " (show (first x))
-                                  (did-you-mean (first x) (sort expr-tags)))
+                                  (did-you-mean (first x) (filter (fn [t] (> (php/strlen (name t)) 2)) (sort expr-tags))))
                              (str "Unsupported operand, use [:raw ...] or :in for lists: " (show x))))
     :else         ["?" [x]]))

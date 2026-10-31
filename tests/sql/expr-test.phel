@@ -109,3 +109,119 @@
           {:select [[:over [:filter [:fn :sum :amount] [:= :refunded false]]
                      {:partition-by [:user_id]}]]
            :from [:orders]}))))
+
+;; ---- Operators ----
+
+(deftest test-operator-add-columns
+  (is (= ["SELECT price + tax AS total FROM t" []]
+         (sql/format {:select [[[:+ :price :tax] :total]] :from [:t]}))))
+
+(deftest test-operator-subtract
+  (is (= ["SELECT a - b FROM t" []] (sql/format {:select [[:- :a :b]] :from [:t]}))))
+
+(deftest test-operator-multiply
+  (is (= ["SELECT a * b FROM t" []] (sql/format {:select [[:* :a :b]] :from [:t]}))))
+
+(deftest test-operator-divide
+  (is (= ["SELECT a / b FROM t" []] (sql/format {:select [[:div :a :b]] :from [:t]}))))
+
+(deftest test-operator-modulo
+  (is (= ["SELECT a % b FROM t" []] (sql/format {:select [[:% :a :b]] :from [:t]}))))
+
+(deftest test-operator-concat
+  (is (= ["SELECT first || ? || last FROM t" [" "]]
+         (sql/format {:select [[:|| :first " " :last]] :from [:t]}))))
+
+(deftest test-operator-variadic
+  (is (= ["SELECT a + b + c + ? FROM t" [1]]
+         (sql/format {:select [[:+ :a :b :c 1]] :from [:t]}))))
+
+(deftest test-operator-nested-is-wrapped
+  (is (= ["SELECT (a + b) * c FROM t" []]
+         (sql/format {:select [[:* [:+ :a :b] :c]] :from [:t]}))))
+
+(deftest test-operator-nested-on-the-right
+  (is (= ["SELECT a - (b - c) FROM t" []]
+         (sql/format {:select [[:- :a [:- :b :c]]] :from [:t]}))))
+
+(deftest test-operator-params-left-to-right
+  (is (= ["SELECT ((a + ?) * ?) - ? FROM t" [1 2 3]]
+         (sql/format {:select [[:- [:* [:+ :a 1] 2] 3]] :from [:t]}))))
+
+(deftest test-operator-with-function-operand-not-wrapped
+  (is (= ["SELECT sum(a) + ? FROM t" [1]]
+         (sql/format {:select [[:+ [:fn :sum :a] 1]] :from [:t]}))))
+
+(deftest test-operator-inside-fn
+  (is (= ["SELECT round(a * ?) FROM t" [2]]
+         (sql/format {:select [[:fn :round [:* :a 2]]] :from [:t]}))))
+
+(deftest test-operator-inside-cast
+  (is (= ["SELECT CAST(a + b AS int) FROM t" []]
+         (sql/format {:select [[:cast [:+ :a :b] :int]] :from [:t]}))))
+
+(deftest test-operator-inside-case
+  (is (= ["SELECT CASE WHEN a > ? THEN a - ? ELSE ? END FROM t" [0 1 0]]
+         (sql/format {:select [[:case [:> :a 0] [:- :a 1] :else 0]] :from [:t]}))))
+
+(deftest test-operator-in-where
+  (is (= ["SELECT * FROM t WHERE price + tax > ?" [100]]
+         (sql/format {:select [:*] :from [:t] :where [:> [:+ :price :tax] 100]}))))
+
+(deftest test-operator-in-order-by
+  (is (= ["SELECT * FROM t ORDER BY a - b DESC" []]
+         (sql/format {:select [:*] :from [:t] :order-by [[[:- :a :b] :desc]]}))))
+
+(deftest test-operator-in-group-by
+  (is (= ["SELECT a % ? FROM t GROUP BY a % ?" [2 3]]
+         (sql/format {:select [[:% :a 2]] :from [:t] :group-by [[:% :a 3]]}))))
+
+(deftest test-operator-in-update-set
+  (is (= ["UPDATE t SET n = n + ? WHERE id = ?" [1 7]]
+         (sql/format {:update :t :set {:n [:+ :n 1]} :where [:= :id 7]}))))
+
+;; ---- JSON operators ----
+
+(deftest test-json-text-arrow-with-alias
+  (is (= ["SELECT price + tax AS total, data ->> ? AS n FROM t" ["name"]]
+         (sql/format {:select [[[:+ :price :tax] :total] [[:->> :data "name"] :n]] :from [:t]}))))
+
+(deftest test-json-arrow
+  (is (= ["SELECT data -> ? FROM t" ["a"]] (sql/format {:select [[:-> :data "a"]] :from [:t]}))))
+
+(deftest test-json-path
+  (is (= ["SELECT data #> ? FROM t" ["{a,b}"]] (sql/format {:select [[:json-path :data "{a,b}"]] :from [:t]}))))
+
+(deftest test-json-path-text
+  (is (= ["SELECT data #>> ? FROM t" ["{a,b}"]] (sql/format {:select [[:json-path-text :data "{a,b}"]] :from [:t]}))))
+
+(deftest test-json-contains
+  (is (= ["SELECT data @> ? FROM t" ["[1]"]] (sql/format {:select [[:json-contains :data "[1]"]] :from [:t]}))))
+
+(deftest test-json-contained-by
+  (is (= ["SELECT data <@ ? FROM t" ["{}"]] (sql/format {:select [[:json-contained-by :data "{}"]] :from [:t]}))))
+
+(deftest test-json-in-where
+  (is (= ["SELECT * FROM t WHERE data ->> ? = ?" ["name" "x"]]
+         (sql/format {:select [:*] :from [:t] :where [:= [:->> :data "name"] "x"]}))))
+
+(deftest test-json-chained-is-wrapped
+  (is (= ["SELECT (data -> ?) ->> ? FROM t" ["a" "b"]]
+         (sql/format {:select [[:->> [:-> :data "a"] "b"]] :from [:t]}))))
+
+(deftest test-json-inside-concat
+  (is (= ["SELECT (data ->> ?) || ? FROM t" ["a" "!"]]
+         (sql/format {:select [[:|| [:->> :data "a"] "!"]] :from [:t]}))))
+
+(deftest test-json-contains-as-where-condition
+  (is (= ["SELECT * FROM t WHERE doc @> CAST(? AS jsonb)" ["{}"]]
+         (sql/format {:select [:*] :from [:t] :where [:json-contains :doc [:cast "{}" :jsonb]]}))))
+
+(deftest test-json-contained-by-as-where-condition
+  (is (= ["SELECT * FROM t WHERE doc <@ ?" ["{}"]]
+         (sql/format {:select [:*] :from [:t] :where [:json-contained-by :doc "{}"]}))))
+
+(deftest test-json-contains-inside-and-and-having
+  (is (= ["SELECT a FROM t GROUP BY a HAVING (doc @> ?) AND (n > ?)" ["{}" 1]]
+         (sql/format {:select [:a] :from [:t] :group-by [:a]
+                      :having [:and [:json-contains :doc "{}"] [:> :n 1]]}))))
