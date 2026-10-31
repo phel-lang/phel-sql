@@ -8,7 +8,9 @@
 
 (def- identifier-segment-pattern "/^(?:[\\p{L}_$][\\p{L}\\p{N}_$]*|[0-9]+|\\*)$/u")
 
-(defn- check-identifier-segments! [kw text]
+(defn- check-identifier-segments!
+  "Throws unless every dot-separated part of `text` is a plain name, a number or `*`."
+  [kw text]
   (when-not (every? (fn [segment] (= 1 (php/preg_match identifier-segment-pattern segment)))
                     (str/split text #"\."))
     (bad-arg (str "Invalid identifier: " (show kw)
@@ -16,8 +18,8 @@
 
 (defn- ident
   "Render a plain identifier (no params, no subquery).
-    keyword         -> bare name (qualified -> 'schema.name')
-    string          -> literal escape hatch"
+    keyword         -> bare name (qualified -> 'schema.name'), validated
+    string          -> literal escape hatch, rendered verbatim"
   [x]
   (cond
     (keyword? x) (let [ns (namespace x)]
@@ -26,6 +28,13 @@
                    (if ns (str ns "." (name x)) (name x)))
     (string? x)  x
     :else        (bad-arg (str "Unsupported identifier: " (show x)))))
+
+(defn- emit-aliased [x]
+  (when-not (= 2 (count x))
+    (bad-arg (str "alias expects [base alias], got: " (show x))))
+  (let [[base alias]     x
+        [b-sql b-params] (ident+ base)]
+    [(str b-sql " AS " (ident alias)) b-params]))
 
 (defn- ident+
   "Identifier with optional params. Accepts everything `ident` does, plus
@@ -37,14 +46,14 @@
   (cond
     (tagged? x)   (emit-tagged x)
     (subquery? x) (let [[s p] (compile-query x)] [(str "(" s ")") p])
-    (vector? x)
-    (let [_                (when-not (= 2 (count x))
-                             (bad-arg (str "alias expects [base alias], got: " (show x))))
-          [base alias]     x
-          [b-sql b-params] (ident+ base)]
-      [(str b-sql " AS " (ident alias)) b-params])
+    (vector? x)   (emit-aliased x)
     :else         [(ident x) []]))
 
 (defn- idents+ [xs]
   (let [parts (map ident+ xs)]
     [(str/join ", " (sqls-of parts)) (params-of parts)]))
+
+(defn- emit-ident-list
+  "`PREFIX a, b, c` for a clause whose value is a non-empty list of identifiers."
+  [prefix clause xs]
+  (prefixed prefix (idents+ (non-empty-vector! clause xs))))

@@ -8,14 +8,14 @@
     (vector? item)
     (let [[col dir nulls]  item
           dir-sql          (case dir
-                    :asc  "ASC"
-                    :desc "DESC"
-                    (bad-arg (str "order direction must be :asc or :desc, got: " (show dir))))
+                             :asc  "ASC"
+                             :desc "DESC"
+                             (bad-arg (str "order direction must be :asc or :desc, got: " (show dir))))
           nulls-sql        (when nulls
-                      (case nulls
-                        :nulls-first "NULLS FIRST"
-                        :nulls-last  "NULLS LAST"
-                        (bad-arg (str "nulls modifier must be :nulls-first or :nulls-last, got: " (show nulls)))))
+                             (case nulls
+                               :nulls-first "NULLS FIRST"
+                               :nulls-last  "NULLS LAST"
+                               (bad-arg (str "nulls modifier must be :nulls-first or :nulls-last, got: " (show nulls)))))
           [c-sql c-params] (ident+ col)]
       [(str c-sql " " dir-sql (when nulls-sql (str " " nulls-sql))) c-params])
 

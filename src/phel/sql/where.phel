@@ -20,12 +20,19 @@
     [(str l-sql " " op-sql " " r-sql)
      (concat l-params r-params)]))
 
-(defn- emit-comparison [op args]
-  (let [[lhs rhs] args]
+(def- null-comparison-ops #{:= :!=})
+
+(defn- emit-comparison
+  "Binary comparison. A literal nil beside `=` or `!=` becomes IS [NOT] NULL,
+   because `a = NULL` never matches."
+  [op args]
+  (let [[lhs rhs] args
+        negate?   (= op :!=)]
     (cond
-      (and (contains? #{:= :!=} op) (nil? rhs)) (emit-null lhs (= op :!=))
-      (and (contains? #{:= :!=} op) (nil? lhs)) (emit-null rhs (= op :!=))
-      :else                                     (emit-binary op args))))
+      (not (contains? null-comparison-ops op)) (emit-binary op args)
+      (nil? rhs)                               (emit-null lhs negate?)
+      (nil? lhs)                               (emit-null rhs negate?)
+      :else                                    (emit-binary op args))))
 
 (defn- emit-logical [joiner clauses]
   (when (empty? clauses)
