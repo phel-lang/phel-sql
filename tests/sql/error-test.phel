@@ -344,3 +344,21 @@
 (deftest test-rejects-form-outside-group-by-with-location-message
   (is (thrown-with-msg? \InvalidArgumentException ":rollup is only valid inside :group-by, got: [:rollup :a]"
                         (sql/format {:select [[:rollup :a]] :from [:t]}))))
+
+
+(deftest test-malformed-clause-still-throws-next-to-nil-items
+  (is (thrown-with-msg? \InvalidArgumentException "where operator := expects 2 argument(s), got: 1"
+                        (sql/format {:select [:id] :from [:t]
+                                     :where [:and nil [:= nil]]}))))
+
+(deftest test-bare-nil-operand-of-not-still-throws
+  (is (thrown-with-msg? \InvalidArgumentException "where clause must be a vector, got: nil"
+                        (sql/format {:select [:id] :from [:t] :where [:not nil]}))))
+
+(deftest test-not-over-all-nil-logical-throws
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :where [:not [:and nil]]}))))
+
+(deftest test-empty-and-still-throws
+  (is (thrown-with-msg? \InvalidArgumentException "AND expects at least one clause"
+                        (sql/format {:select [:id] :from [:t] :where [:and]}))))

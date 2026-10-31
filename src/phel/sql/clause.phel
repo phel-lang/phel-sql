@@ -48,8 +48,12 @@
                     (non-empty-vector! :group-by cols))]
     [(str "GROUP BY " (str/join ", " (sqls-of parts))) (params-of parts)]))
 (defn- emit-returning       [cols] (emit-ident-list "RETURNING"       :returning       cols))
-(defn- emit-where-clause    [w]    (prefixed "WHERE"  (emit-where w)))
-(defn- emit-having-clause   [w]    (prefixed "HAVING" (emit-where w)))
+(defn- emit-optional-where [prefix w]
+  (when-let [emitted (emit-where-or-nil w)]
+    (prefixed prefix emitted)))
+
+(defn- emit-where-clause    [w]    (emit-optional-where "WHERE" w))
+(defn- emit-having-clause   [w]    (emit-optional-where "HAVING" w))
 
 ;; ===========================================================================
 ;; WINDOW
