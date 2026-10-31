@@ -109,7 +109,7 @@
                (sql/format {:delete-from :t :returning []}))))
 
 (deftest test-rejects-empty-columns
-  (is (thrown-with-msg? \InvalidArgumentException ":columns expects a non-empty vector or list, got: []"
+  (is (thrown-with-msg? \InvalidArgumentException "in :columns: expects a non-empty vector or list, got: []"
                         (sql/format {:insert-into :t :columns [] :values [[1]]}))))
 
 (deftest test-rejects-keyword-partition-by
@@ -117,7 +117,7 @@
                (sql/format {:select [[:over [:fn :sum :x] {:partition-by :a}]] :from [:t]}))))
 
 (deftest test-error-message-names-the-clause
-  (is (thrown-with-msg? \InvalidArgumentException ":group-by expects a non-empty vector or list, got: []"
+  (is (thrown-with-msg? \InvalidArgumentException "in :group-by: expects a non-empty vector or list, got: []"
                         (sql/format {:select [:id] :from [:t] :group-by []}))))
 
 (deftest test-rejects-update-without-set
@@ -139,11 +139,11 @@
                (sql/format {:select [:id] :from [:t] :where [:in :a [[1 2]]]}))))
 
 (deftest test-error-message-shows-keyword-as-phel-literal
-  (is (thrown-with-msg? \InvalidArgumentException "Unknown where operator: :bogus"
+  (is (thrown-with-msg? \InvalidArgumentException "in :where: Unknown where operator: :bogus"
                         (sql/format {:select [:id] :from [:t] :where [:bogus :a 1]}))))
 
 (deftest test-error-message-shows-map-on-one-line
-  (is (thrown-with-msg? \InvalidArgumentException "Unsupported order-by item: {:a 1}"
+  (is (thrown-with-msg? \InvalidArgumentException "in :order-by: Unsupported order-by item: {:a 1}"
                         (sql/format {:select [:id] :from [:t] :order-by [{:a 1}]}))))
 
 (deftest test-rejects-raw-without-sql
@@ -205,13 +205,13 @@
                                         {:select [:id] :from [:d]}]}))))
 
 (deftest test-rejects-negative-set-op-limit
-  (is (thrown-with-msg? \InvalidArgumentException "limit must be a non-negative integer, got: -1"
+  (is (thrown-with-msg? \InvalidArgumentException "in :limit: limit must be a non-negative integer, got: -1"
                         (sql/format {:union [{:select [:id] :from [:a]}
                                              {:select [:id] :from [:b]}]
                                      :limit -1}))))
 
 (deftest test-rejects-bad-set-op-with-shape
-  (is (thrown-with-msg? \InvalidArgumentException "WITH binding must be [name query], got: :oops"
+  (is (thrown-with-msg? \InvalidArgumentException "in :with: WITH binding must be [name query], got: :oops"
                         (sql/format {:union [{:select [:id] :from [:a]}
                                              {:select [:id] :from [:b]}]
                                      :with  [:oops]}))))
@@ -291,34 +291,34 @@
                (sql/format {:select [[:over [:fn :rank] {:window 42}]] :from [:t]}))))
 
 (deftest test-window-entry-reports-bad-name-first
-  (is (thrown-with-msg? \InvalidArgumentException "window name must be a keyword or string, got: 1"
+  (is (thrown-with-msg? \InvalidArgumentException "in :window: window name must be a keyword or string, got: 1"
                         (sql/format {:select [:id] :from [:t] :window [[1 :x]]}))))
 
 (deftest test-window-entry-reports-bad-spec
-  (is (thrown-with-msg? \InvalidArgumentException ":window expects a window-spec map, got: :x"
+  (is (thrown-with-msg? \InvalidArgumentException "in :window: expects a window-spec map, got: :x"
                         (sql/format {:select [:id] :from [:t] :window [[:w :x]]}))))
 
 (deftest test-rejects-over-extra-argument
-  (is (thrown-with-msg? \InvalidArgumentException "over expects [:over expr window], got: [:over [:fn :rank] :w :x]"
+  (is (thrown-with-msg? \InvalidArgumentException "in :select: over expects [:over expr window], got: [:over [:fn :rank] :w :x]"
                         (sql/format {:select [[:over [:fn :rank] :w :x]] :from [:t]}))))
 
 (deftest test-rejects-over-missing-window
-  (is (thrown-with-msg? \InvalidArgumentException "over expects [:over expr window], got: [:over [:fn :rank]]"
+  (is (thrown-with-msg? \InvalidArgumentException "in :select: over expects [:over expr window], got: [:over [:fn :rank]]"
                         (sql/format {:select [[:over [:fn :rank]]] :from [:t]}))))
 (deftest test-rejects-empty-rollup
-  (is (thrown-with-msg? \InvalidArgumentException ":rollup expects at least one column, got: [:rollup]"
+  (is (thrown-with-msg? \InvalidArgumentException "in :group-by: :rollup expects at least one column, got: [:rollup]"
                         (sql/format {:select [:a] :from [:t] :group-by [[:rollup]]}))))
 
 (deftest test-rejects-empty-cube
-  (is (thrown-with-msg? \InvalidArgumentException ":cube expects at least one column, got: [:cube]"
+  (is (thrown-with-msg? \InvalidArgumentException "in :group-by: :cube expects at least one column, got: [:cube]"
                         (sql/format {:select [:a] :from [:t] :group-by [[:cube]]}))))
 
 (deftest test-rejects-empty-grouping-sets
-  (is (thrown-with-msg? \InvalidArgumentException ":grouping-sets expects at least one set, got: [:grouping-sets]"
+  (is (thrown-with-msg? \InvalidArgumentException "in :group-by: :grouping-sets expects at least one set, got: [:grouping-sets]"
                         (sql/format {:select [:a] :from [:t] :group-by [[:grouping-sets]]}))))
 
 (deftest test-rejects-non-vector-grouping-set
-  (is (thrown-with-msg? \InvalidArgumentException ":grouping-sets expects each set to be a vector or list, got: :a"
+  (is (thrown-with-msg? \InvalidArgumentException "in :group-by: :grouping-sets expects each set to be a vector or list, got: :a"
                         (sql/format {:select [:a] :from [:t] :group-by [[:grouping-sets :a]]}))))
 
 (deftest test-rejects-nested-rollup
@@ -338,20 +338,20 @@
                (sql/format {:select [:a] :from [:t] :order-by [[:grouping-sets [:a]]]}))))
 
 (deftest test-rejects-nested-form-with-nesting-message
-  (is (thrown-with-msg? \InvalidArgumentException "Nested :cube is not allowed inside :rollup, :cube or a grouping set, got: [:cube :a]"
+  (is (thrown-with-msg? \InvalidArgumentException "in :group-by: Nested :cube is not allowed inside :rollup, :cube or a grouping set, got: [:cube :a]"
                         (sql/format {:select [:a] :from [:t] :group-by [[:rollup [:cube :a]]]}))))
 
 (deftest test-rejects-form-outside-group-by-with-location-message
-  (is (thrown-with-msg? \InvalidArgumentException ":rollup is only valid inside :group-by, got: [:rollup :a]"
+  (is (thrown-with-msg? \InvalidArgumentException "in :select: :rollup is only valid inside :group-by, got: [:rollup :a]"
                         (sql/format {:select [[:rollup :a]] :from [:t]}))))
 
 (deftest test-malformed-clause-still-throws-next-to-nil-items
-  (is (thrown-with-msg? \InvalidArgumentException "where operator := expects 2 argument(s), got: 1"
+  (is (thrown-with-msg? \InvalidArgumentException "in :where: where operator := expects 2 argument(s), got: 1"
                         (sql/format {:select [:id] :from [:t]
                                      :where [:and nil [:= nil]]}))))
 
 (deftest test-bare-nil-operand-of-not-still-throws
-  (is (thrown-with-msg? \InvalidArgumentException "where clause must be a vector, got: nil"
+  (is (thrown-with-msg? \InvalidArgumentException "in :where: where clause must be a vector, got: nil"
                         (sql/format {:select [:id] :from [:t] :where [:not nil]}))))
 
 (deftest test-not-over-all-nil-logical-throws
@@ -359,27 +359,27 @@
                (sql/format {:select [:id] :from [:t] :where [:not [:and nil]]}))))
 
 (deftest test-empty-and-still-throws
-  (is (thrown-with-msg? \InvalidArgumentException "AND expects at least one clause"
+  (is (thrown-with-msg? \InvalidArgumentException "in :where: AND expects at least one clause"
                         (sql/format {:select [:id] :from [:t] :where [:and]}))))
 
 (deftest test-update-where-nil-throws
   (is (thrown-with-msg? \InvalidArgumentException
-                        "update statement has an empty :where; omit :where to update every row"
+                        "in :where: update statement has an empty :where; omit :where to update every row"
                         (sql/format {:update :t :set {:a 1} :where nil}))))
 
 (deftest test-update-where-all-nil-throws
   (is (thrown-with-msg? \InvalidArgumentException
-                        "update statement has an empty :where; omit :where to update every row"
+                        "in :where: update statement has an empty :where; omit :where to update every row"
                         (sql/format {:update :t :set {:a 1} :where [:and nil nil]}))))
 
 (deftest test-delete-where-nil-throws
   (is (thrown-with-msg? \InvalidArgumentException
-                        "delete statement has an empty :where; omit :where to delete every row"
+                        "in :where: delete statement has an empty :where; omit :where to delete every row"
                         (sql/format {:delete-from :t :where nil}))))
 
 (deftest test-delete-where-all-nil-throws
   (is (thrown-with-msg? \InvalidArgumentException
-                        "delete statement has an empty :where; omit :where to delete every row"
+                        "in :where: delete statement has an empty :where; omit :where to delete every row"
                         (sql/format {:delete-from :t :where [:or nil [:and nil]]}))))
 
 (deftest test-do-update-where-all-nil-throws
@@ -393,14 +393,113 @@
 
 (deftest test-do-update-where-nil-throws
   (is (thrown-with-msg? \InvalidArgumentException
-                        "where clause must be a vector, got: nil"
+                        "in :do-update-where: where clause must be a vector, got: nil"
                         (sql/format {:insert-into :t :values [[1 "x"]] :columns [:a :b]
                                      :on-conflict [:a] :do-update-set {:b "u"}
                                      :do-update-where nil}))))
 
 (deftest test-do-update-where-and-nil-throws
   (is (thrown-with-msg? \InvalidArgumentException
-                        "where clause is empty: every item is nil"
+                        "in :do-update-where: where clause is empty: every item is nil"
                         (sql/format {:insert-into :t :values [[1 "x"]] :columns [:a :b]
                                      :on-conflict [:a] :do-update-set {:b "u"}
                                      :do-update-where [:and nil]}))))
+
+(deftest test-unknown-clause-suggests-closest
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "Unknown clause(s) for this statement: selct (did you mean :select?)"
+                        (sql/format {:selct [:a]}))))
+
+(deftest test-unknown-clause-without-near-match-has-no-suggestion
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "Unknown clause(s) for this statement: zzzzzz"
+                        (sql/format {:select [:id] :zzzzzz [:dept]}))))
+
+(deftest test-unknown-where-operator-suggests-closest
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :where: Unknown where operator: :betwen (did you mean :between?)"
+                        (sql/format {:select [:id] :from [:t] :where [:betwen :a 1 2]}))))
+
+(deftest test-unknown-expression-tag-suggests-closest
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :where: Unknown expression tag: :cas (did you mean :case?)"
+                        (sql/format {:select [:id] :from [:t] :where [:= :a [:cas :b 1]]}))))
+
+(deftest test-kebab-identifier-suggests-snake-case
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :select: Invalid identifier: :created-at. Use a string or [:raw ...] for names outside letters, digits, _ and $ (did you mean :created_at?)"
+                        (sql/format {:select [:created-at] :from [:t]}))))
+
+(deftest test-invalid-identifier-without-dash-has-no-suggestion
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :select: Invalid identifier: :a+b. Use a string or [:raw ...] for names outside letters, digits, _ and $"
+                        (sql/format {:select [:a+b] :from [:t]}))))
+
+(deftest test-join-error-names-the-join-clause
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :join: Invalid identifier: :orders/user-id. Use a string or [:raw ...] for names outside letters, digits, _ and $ (did you mean :orders/user_id?)"
+                        (sql/format {:select [:id] :from [:t] :join [:orders [:= :t/id :orders/user-id]]}))))
+
+(deftest test-where-error-inside-subquery-keeps-innermost-clause-only
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :where > :select: Invalid identifier: :a-b. Use a string or [:raw ...] for names outside letters, digits, _ and $ (did you mean :a_b?)"
+                        (sql/format {:select [:id] :from [:t]
+                                     :where [:in :id {:select [:a-b] :from [:u]}]}))))
+
+(deftest test-insert-error-names-the-values-clause
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :values: Invalid identifier: :bad-col. Use a string or [:raw ...] for names outside letters, digits, _ and $ (did you mean :bad_col?)"
+                        (sql/format {:insert-into :t :values [{:bad-col 1}]}))))
+
+(deftest test-insert-returning-error-names-the-returning-clause
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :returning: Invalid identifier: :new-id. Use a string or [:raw ...] for names outside letters, digits, _ and $ (did you mean :new_id?)"
+                        (sql/format {:insert-into :t :values [[1]] :returning [:new-id]}))))
+
+(deftest test-kebab-hint-skipped-when-snake-case-is-still-invalid
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :select: Invalid identifier: :a-b+c. Use a string or [:raw ...] for names outside letters, digits, _ and $"
+                        (sql/format {:select [:a-b+c] :from [:t]}))))
+
+(deftest test-nested-clauses-build-a-path
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :from > :where: Unknown where operator: :bogus"
+                        (sql/format {:select [:id] :from [{:select [:id] :from [:t] :where [:bogus :a 1]}]}))))
+
+(deftest test-nested-same-clause-is-not-repeated
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :where: Unknown where operator: :bogus"
+                        (sql/format {:select [:id] :from [:t]
+                                     :where [:in :id {:select [:id] :from [:u] :where [:bogus :a 1]}]}))))
+
+(deftest test-on-conflict-where-error-names-its-own-key
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :on-conflict-where: where clause must be a vector, got: nil"
+                        (sql/format {:insert-into :t :values [[1]] :columns [:a] :on-conflict [:a]
+                                     :on-conflict-where nil :do-nothing true}))))
+
+(deftest test-do-update-set-error-names-its-own-key
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :do-update-set: Invalid identifier: :b-c. Use a string or [:raw ...] for names outside letters, digits, _ and $ (did you mean :b_c?)"
+                        (sql/format {:insert-into :t :values [[1]] :columns [:a] :on-conflict [:a]
+                                     :do-update-set {:b-c 1}}))))
+
+(deftest test-non-keyword-clause-key-throws-invalid-argument
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "Unknown clause(s) for this statement: 1"
+                        (sql/format {:select [:a] :from [:t] 1 2}))))
+
+(deftest test-missing-where-operator-has-no-suggestion
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :where: Unknown where operator: nil"
+                        (sql/format {:select [:id] :from [:t] :where []}))))
+
+(deftest test-far-where-operator-has-no-suggestion
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :where: Unknown where operator: :neq"
+                        (sql/format {:select [:id] :from [:t] :where [:neq :a 1]}))))
+
+(deftest test-short-where-operator-suggests-first-candidate-by-name
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "in :where: Unknown where operator: :on (did you mean :in?)"
+                        (sql/format {:select [:id] :from [:t] :where [:on :a 1]}))))

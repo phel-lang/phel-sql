@@ -29,9 +29,9 @@
 (defn- emit-on-conflict-block [query]
   (when (contains? query :on-conflict)
     (let [target                     (get query :on-conflict)
-          [target-sql target-params] (emit-on-conflict-target target)
+          [target-sql target-params] (in-clause :on-conflict (fn [] (emit-on-conflict-target target)))
           where-sql                  (when (contains? query :on-conflict-where)
-                                       (emit-where (get query :on-conflict-where)))
+                                       (in-clause :on-conflict-where (fn [] (emit-where (get query :on-conflict-where)))))
           do-nothing?                (get query :do-nothing)
           do-update                  (get query :do-update-set)]
       (when (and do-nothing? do-update)
@@ -44,9 +44,9 @@
           [(str head " DO NOTHING") head-params]
 
           do-update
-          (let [[set-sql set-params] (emit-set do-update)
+          (let [[set-sql set-params] (in-clause :do-update-set (fn [] (emit-set do-update)))
                 upd-where            (when (contains? query :do-update-where)
-                                       (emit-where (get query :do-update-where)))]
+                                       (in-clause :do-update-where (fn [] (emit-where (get query :do-update-where)))))]
             [(str head " DO UPDATE " set-sql
                   (when upd-where (str " WHERE " (first upd-where))))
              (concat head-params set-params (if upd-where (second upd-where) []))])

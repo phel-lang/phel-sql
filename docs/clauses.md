@@ -356,6 +356,8 @@ When `:values` is the only key, the result is a standalone `VALUES` expression.
 
 Malformed input throws `InvalidArgumentException`. The message names the problem and shows the offending value as a Phel literal, for example `Unknown where operator: :bogus`.
 
+Messages from inside a clause start with `in :clause:`, for example `in :join: Invalid identifier: :orders/user-id. ...`. Nested subqueries build a path, outermost clause first: `in :from > :where: ...`. Messages for unknown clauses, WHERE operators and expression tags end with `(did you mean :select?)` when a keyword is close enough (edit distance 1 for names of 3 characters or fewer, else 2). An invalid identifier with a `-` also suggests the snake_case keyword when that one is valid: `(did you mean :created_at?)`. Keywords are never converted for you.
+
 - Input that is not a map, or an unknown clause for the statement kind.
 - More than one of `:select`, `:select-distinct` and `:select-distinct-on`.
 - An unsupported identifier, such as a number, or a keyword with characters other than letters, digits, `_`, `$` and `.`.

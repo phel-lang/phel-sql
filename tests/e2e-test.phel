@@ -312,7 +312,7 @@
 
 (deftest test-cookbook-faq-kebab-keyword-fails
   (is (thrown-with-msg? \InvalidArgumentException
-                        "Invalid identifier: :created-at. Use a string or [:raw ...] for names outside letters, digits, _ and $"
+                        "in :order-by: Invalid identifier: :created-at. Use a string or [:raw ...] for names outside letters, digits, _ and $ (did you mean :created_at?)"
                         (sql/format {:select [:id] :from [:users] :order-by [[:created-at :desc]]}))))
 
 (deftest test-cookbook-migrate-raw-step-one

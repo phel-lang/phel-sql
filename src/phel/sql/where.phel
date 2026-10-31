@@ -99,6 +99,9 @@
       (bad-arg (str "where operator " (show op) " expects " expected
                     " argument(s), got: " (count args))))))
 
+(def- where-operators
+  (vec (concat (keys binary-ops) (keys special-op-arity) [:and :or])))
+
 (defn- emit-where-body [clause]
   (when-not (vector? clause)
     (bad-arg (str "where clause must be a vector, got: " (show clause))))
@@ -118,7 +121,8 @@
       :not-exists  (emit-exists args true)
       (if (contains? binary-ops op)
         (emit-comparison op args)
-        (bad-arg (str "Unknown where operator: " (show op)))))))
+        (bad-arg (str "Unknown where operator: " (show op)
+                      (did-you-mean op where-operators)))))))
 
 (defn- emit-where-or-nil
   "Like `emit-where`, but a nil clause, or a logical clause whose items are all
