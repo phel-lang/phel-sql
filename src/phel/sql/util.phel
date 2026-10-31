@@ -6,13 +6,17 @@
 (defn- show [x] (pr-str x))
 
 (defn- closest-candidate
-  "The candidate within edit distance 2 of `input`, smallest first, ties by candidate order."
+  "The candidate closest to `input` by edit distance (1 for inputs of 3 characters
+   or fewer, else 2). Ties go to the first candidate by name. Nil for other inputs."
   [input candidates]
-  (let [wanted (if (keyword? input) (name input) (str input))
-        scored (map (fn [c] [(php/levenshtein wanted (name c)) c]) candidates)
-        near   (filter (fn [[dist _]] (<= dist 2)) scored)]
-    (when (seq near)
-      (second (reduce (fn [best cur] (if (< (first cur) (first best)) cur best)) near)))))
+  (when (or (keyword? input) (string? input))
+    (let [wanted (if (keyword? input) (name input) input)
+          limit  (if (<= (php/strlen wanted) 3) 1 2)
+          scored (map (fn [c] [(php/levenshtein wanted (name c)) c])
+                      (sort-by name candidates))
+          near   (filter (fn [[dist _]] (<= dist limit)) scored)]
+      (when (seq near)
+        (second (reduce (fn [best cur] (if (< (first cur) (first best)) cur best)) near))))))
 
 (defn- did-you-mean
   "` (did you mean :x?)` for the closest keyword in `candidates`, or an empty string."
@@ -22,16 +26,29 @@
     ""))
 
 (defn- in-clause
-  "Runs `f`. An InvalidArgumentException from it gets an `in :clause: ` prefix,
-   unless it already names an inner clause."
+  "Runs `f`. An InvalidArgumentException from it is rethrown as `in :clause: msg`.
+   Inside nested clauses the path grows outward (`in :from > :where: msg`), a
+   repeated adjacent clause is not added, and a message that starts with its own
+   clause name drops it."
   [clause f]
   (try
     (f)
     (catch \InvalidArgumentException e
-      (let [msg (.getMessage e)]
-        (if (php/str_starts_with msg "in :")
-          (throw e)
-          (throw (new \InvalidArgumentException (str "in " (show clause) ": " msg) 0 e)))))))
+      (let [msg   (.getMessage e)
+            label (show clause)
+            split (when (php/str_starts_with msg "in :") (php/strpos msg ": "))]
+        (throw
+         (new \InvalidArgumentException
+              (if split
+                (let [path (php/substr msg 3 (- split 3))
+                      rest (php/substr msg (+ split 2))]
+                  (if (= label (get (php/explode " > " path) 0))
+                    msg
+                    (str "in " label " > " path ": " rest)))
+                (let [own (str label " ")]
+                  (str "in " label ": "
+                       (if (php/str_starts_with msg own) (php/substr msg (php/strlen own)) msg))))
+              0 e))))))
 
 (defn- params-of [fragments] (vec (mapcat (fn [[_ p]] p) fragments)))
 (defn- sqls-of   [fragments] (mapv first fragments))

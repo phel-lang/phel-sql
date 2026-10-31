@@ -13,9 +13,11 @@
 (def- identifier-pattern (str "/^" identifier-segment "(?:\\." identifier-segment ")*$/Du"))
 
 (defn- snake-case-hint [kw]
-  (let [written (subs (show kw) 1)]
-    (if (php/str_contains written "-")
-      (str " (did you mean :" (str/replace written "-" "_") " or " (show written) "?)")
+  (let [written (str/replace (subs (show kw) 1) "-" "_")
+        valid?  (every? (fn [part] (= 1 (php/preg_match identifier-pattern part)))
+                        (php/explode "/" written))]
+    (if (and (php/str_contains (show kw) "-") valid?)
+      (str " (did you mean :" written "?)")
       "")))
 
 (defn- check-identifier!

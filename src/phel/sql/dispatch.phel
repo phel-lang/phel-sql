@@ -101,7 +101,7 @@
                      (filter (fn [k] (not (contains? allowed k)))))]
     (when (seq unknown)
       (bad-arg (str "Unknown clause(s) for this statement: "
-                    (str/join ", " (map (fn [k] (str (name k) (did-you-mean k allowed))) unknown)))))))
+                    (str/join ", " (map (fn [k] (str (if (keyword? k) (name k) (show k)) (did-you-mean k allowed))) unknown)))))))
 
 (defn- emit-ordered [query emitters clause-order allowed]
   (check-unknown! query allowed)
@@ -174,7 +174,7 @@
                                   (contains? query :with)           (conj (in-clause :with (fn [] (emit-with (get query :with)))))
                                   (contains? query :with-recursive) (conj (in-clause :with-recursive (fn [] (emit-with-recursive (get query :with-recursive))))))
         body              [(in-clause :insert-into (fn [] (emit-insert-into (get query :insert-into))))]
-        conflict          (in-clause :on-conflict (fn [] (emit-on-conflict-block query)))
+        conflict          (emit-on-conflict-block query)
         odku              (when (contains? query :on-duplicate-key-update)
                             (in-clause :on-duplicate-key-update
                                        (fn [] (emit-on-duplicate-key-update (get query :on-duplicate-key-update)))))
