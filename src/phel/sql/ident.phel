@@ -1,11 +1,21 @@
 (in-ns phel.sql)
-(def- expr-tags #{:raw :fn :cast :case :over :filter :lateral})
+
+;; The reader rejects the keywords :/, :@>, :<@, :#> and :#>>, so those operators are spelled :div, :json-contains, :json-contained-by, :json-path and :json-path-text.
+(def- arithmetic-operators {:+ "+" :- "-" :* "*" :div "/" :% "%" :|| "||"})
+
+(def- json-operators {:-> "->" :->> "->>" :json-path "#>" :json-path-text "#>>" :json-contains "@>" :json-contained-by "<@"})
+
+(def- operator-tags (merge arithmetic-operators json-operators))
+
+(def- expr-tags #{:raw :fn :cast :case :over :filter :lateral
+                  :+ :- :* :div :% :|| :-> :->> :json-path :json-path-text :json-contains :json-contained-by})
 
 (def- grouping-tags #{:rollup :cube :grouping-sets})
 
 (defn- grouping-form? [x] (and (vector? x) (contains? grouping-tags (first x))))
 (defn- subquery? [x] (map? x))
 (defn- tagged? [x] (and (vector? x) (keyword? (first x)) (contains? expr-tags (first x))))
+(defn- operator-form? [x] (and (vector? x) (contains? operator-tags (first x))))
 (defn- raw? [x] (and (vector? x) (= :raw (first x)) (= 2 (count x))))
 
 (def- identifier-segment "(?:[\\p{L}_$][\\p{L}\\p{N}_$]*|[0-9]+|\\*)")

@@ -20,7 +20,7 @@ Files in `src/phel/sql/`:
 |------|-------|
 | `util.phel` | error helper, `show`, small shared helpers |
 | `ident.phel` | identifier rules, `ident`, `ident+`, `idents+` |
-| `expr.phel` | `operand` and the tagged forms (`:fn`, `:cast`, `:case`, `:over`, `:filter`, `:lateral`, `:raw`) |
+| `expr.phel` | `operand` and the tagged forms (`:fn`, `:cast`, `:case`, `:over`, `:filter`, `:lateral`, `:raw`, operators) |
 | `where.phel` | WHERE operators and their argument counts |
 | `order.phel`, `join.phel`, `cte.phel`, `clause.phel` | the matching clauses |
 | `dml.phel`, `upsert.phel` | INSERT rows, `:set`, ON CONFLICT, ON DUPLICATE KEY |
