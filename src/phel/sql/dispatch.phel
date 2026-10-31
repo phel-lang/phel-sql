@@ -101,13 +101,13 @@
                      (filter (fn [k] (not (contains? allowed k)))))]
     (when (seq unknown)
       (bad-arg (str "Unknown clause(s) for this statement: "
-                    (str/join ", " (map name unknown)))))))
+                    (str/join ", " (map (fn [k] (str (name k) (did-you-mean k allowed))) unknown)))))))
 
 (defn- emit-ordered [query emitters clause-order allowed]
   (check-unknown! query allowed)
   (let [present (filter (fn [k] (contains? query k)) clause-order)
         parts   (remove (fn [p] (= omitted-clause p))
-                        (map (fn [k] ((get emitters k) (get query k))) present))]
+                        (map (fn [k] (in-clause k (fn [] ((get emitters k) (get query k))))) present))]
     [(str/join " " (sqls-of parts)) (vec (params-of parts))]))
 
 (defn- emit-select-stmt [q]
@@ -152,9 +152,9 @@
   "`{:source-sql :params :columns-sql}` for the `:values` rows or the `:query` subquery."
   [query]
   (if (contains? query :query)
-    (let [[sql params] (compile-query (get query :query))]
+    (let [[sql params] (in-clause :query (fn [] (compile-query (get query :query))))]
       {:source-sql sql :params params :columns-sql nil})
-    (let [vs (normalise-values (get query :values) (get query :columns))]
+    (let [vs (in-clause :values (fn [] (normalise-values (get query :values) (get query :columns))))]
       {:source-sql (get vs :values-sql) :params (get vs :params) :columns-sql (get vs :columns-sql)})))
 
 (defn- emit-insert-stmt [query]
@@ -162,24 +162,26 @@
   (when-not (contains? query :insert-into) (bad-arg "insert statement requires :insert-into"))
   (check-insert-source! query)
   (check-upsert-keys! query)
-  (when (contains? query :columns) (non-empty-vector! :columns (get query :columns)))
+  (when (contains? query :columns)
+    (in-clause :columns (fn [] (non-empty-vector! :columns (get query :columns)))))
   (when (and (contains? query :on-conflict) (contains? query :on-duplicate-key-update))
     (bad-arg ":on-conflict and :on-duplicate-key-update are mutually exclusive"))
   (let [src               (insert-source query)
         columns-sql       (cond
-                            (contains? query :columns) (first (emit-columns (get query :columns)))
+                            (contains? query :columns) (first (in-clause :columns (fn [] (emit-columns (get query :columns)))))
                             :else                      (get src :columns-sql))
         head              (cond-> []
-                                  (contains? query :with)           (conj (emit-with           (get query :with)))
-                                  (contains? query :with-recursive) (conj (emit-with-recursive (get query :with-recursive))))
-        body              [(emit-insert-into (get query :insert-into))]
-        conflict          (emit-on-conflict-block query)
+                                  (contains? query :with)           (conj (in-clause :with (fn [] (emit-with (get query :with)))))
+                                  (contains? query :with-recursive) (conj (in-clause :with-recursive (fn [] (emit-with-recursive (get query :with-recursive))))))
+        body              [(in-clause :insert-into (fn [] (emit-insert-into (get query :insert-into))))]
+        conflict          (in-clause :on-conflict (fn [] (emit-on-conflict-block query)))
         odku              (when (contains? query :on-duplicate-key-update)
-                            (emit-on-duplicate-key-update (get query :on-duplicate-key-update)))
+                            (in-clause :on-duplicate-key-update
+                                       (fn [] (emit-on-duplicate-key-update (get query :on-duplicate-key-update)))))
         tail              (cond-> []
                                   conflict (conj conflict)
                                   odku     (conj odku)
-                                  (contains? query :returning) (conj (emit-returning (get query :returning))))
+                                  (contains? query :returning) (conj (in-clause :returning (fn [] (emit-returning (get query :returning))))))
         leading-fragments (concat head body)
         leading-sql       (str/join " " (sqls-of leading-fragments))
         leading-params    (vec (params-of leading-fragments))
@@ -214,7 +216,7 @@
 (defn- emit-set-op-wrapper [query clause-order]
   (->> clause-order
        (filter (fn [k] (contains? query k)))
-       (map (fn [k] ((get set-op-wrapper-emitters k) (get query k))))))
+       (map (fn [k] (in-clause k (fn [] ((get set-op-wrapper-emitters k) (get query k))))))))
 
 (defn- emit-set-op-stmt [query]
   (let [op     (find-set-op query)
@@ -232,7 +234,7 @@
       (when-not (and (vector? queries) (>= (count queries) 2))
         (bad-arg (str (name op) " expects a vector of at least two queries")))
       (let [head  (emit-set-op-wrapper query set-op-head-order)
-            parts (map compile-query queries)
+            parts (map (fn [q] (in-clause op (fn [] (compile-query q)))) queries)
             body  [(str/join (str " " (get set-op-sql op) " ")
                              (map (fn [[s _]] (str "(" s ")")) parts))
                    (params-of parts)]

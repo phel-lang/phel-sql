@@ -12,12 +12,19 @@
 
 (def- identifier-pattern (str "/^" identifier-segment "(?:\\." identifier-segment ")*$/Du"))
 
+(defn- snake-case-hint [kw]
+  (let [written (subs (show kw) 1)]
+    (if (php/str_contains written "-")
+      (str " (did you mean :" (str/replace written "-" "_") " or " (show written) "?)")
+      "")))
+
 (defn- check-identifier!
   "Throws unless every dot-separated part of `text` is a plain name, a number or `*`."
   [kw text]
   (when-not (= 1 (php/preg_match identifier-pattern text))
     (bad-arg (str "Invalid identifier: " (show kw)
-                  ". Use a string or [:raw ...] for names outside letters, digits, _ and $"))))
+                  ". Use a string or [:raw ...] for names outside letters, digits, _ and $"
+                  (snake-case-hint kw)))))
 
 (defn- ident
   "Render a plain identifier (no params, no subquery).
