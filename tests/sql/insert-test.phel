@@ -53,3 +53,11 @@
 (deftest test-insert-map-rows-with-different-key-counts
   (is (= ["INSERT INTO t (a, b, c) VALUES (?, ?, ?), (?, ?, ?)" [1 nil nil nil 2 3]]
          (sql/format {:insert-into :t :values [{:a 1} {:b 2 :c 3}]}))))
+
+(deftest test-insert-string-columns-with-map-rows
+  (is (= ["INSERT INTO t (b, a) VALUES (?, ?)" [2 1]]
+         (sql/format {:insert-into :t :columns ["b" "a"] :values [{:a 1 :b 2}]}))))
+
+(deftest test-insert-map-row-false-value-is-kept
+  (is (= ["INSERT INTO t (a) VALUES (?)" [false]]
+         (sql/format {:insert-into :t :columns [:a] :values [{:a false}]}))))

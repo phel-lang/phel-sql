@@ -6,7 +6,7 @@
 (defn- tagged? [x] (and (vector? x) (keyword? (first x)) (contains? expr-tags (first x))))
 (defn- raw? [x] (and (vector? x) (= :raw (first x)) (= 2 (count x))))
 
-(def- identifier-segment-pattern "/^(?:[A-Za-z_$][A-Za-z0-9_$]*|[0-9]+|\\*)$/")
+(def- identifier-segment-pattern "/^(?:[\\p{L}_$][\\p{L}\\p{N}_$]*|[0-9]+|\\*)$/u")
 
 (defn- check-identifier-segments! [kw text]
   (when-not (every? (fn [segment] (= 1 (php/preg_match identifier-segment-pattern segment)))

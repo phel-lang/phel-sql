@@ -11,7 +11,9 @@
 (defn- prefixed [prefix [sql params]]
   [(str prefix " " sql) params])
 
-(defn- non-empty-vector! [clause v]
-  (when-not (and (vector? v) (seq v))
-    (bad-arg (str clause " expects a non-empty vector, got: " (show v))))
-  v)
+(defn- non-empty-vector!
+  "Returns `v` as a vector. Accepts any non-empty sequential collection."
+  [clause v]
+  (when-not (and (sequential? v) (seq v))
+    (bad-arg (str clause " expects a non-empty vector or list, got: " (show v))))
+  (vec v))

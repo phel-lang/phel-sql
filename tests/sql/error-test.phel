@@ -109,8 +109,9 @@
                (sql/format {:delete-from :t :returning []}))))
 
 (deftest test-rejects-empty-columns
-  (is (thrown? \InvalidArgumentException
-               (sql/format {:insert-into :t :columns [] :values [[1]]}))))
+  (let [msg (try (sql/format {:insert-into :t :columns [] :values [[1]]})
+                 (catch \InvalidArgumentException e (.getMessage e)))]
+    (is (php/str_contains msg ":columns expects"))))
 
 (deftest test-rejects-keyword-partition-by
   (is (thrown? \InvalidArgumentException

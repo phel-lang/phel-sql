@@ -23,11 +23,15 @@
   (str "(" (str/join ", " (map (fn [_] "?") row)) ")"))
 
 (defn- check-keys-in-columns! [row-keys cols]
-  (let [allowed (set cols)
-        unknown (filter (fn [k] (not (contains? allowed k))) row-keys)]
+  (let [allowed (set (map ident cols))
+        unknown (filter (fn [k] (not (contains? allowed (ident k)))) row-keys)]
     (when (seq unknown)
       (bad-arg (str "values map key(s) not listed in :columns: "
                     (str/join ", " (map show unknown)))))))
+
+(defn- row-values-in-order [row cols]
+  (let [by-ident (into {} (map (fn [k] [(ident k) (get row k)]) (keys row)))]
+    (vec (map (fn [c] (get by-ident (ident c))) cols))))
 
 (defn- check-rows-not-empty! [rows]
   (when (some (fn [r] (zero? (count r))) rows)
@@ -59,7 +63,7 @@
                        (check-keys-in-columns! row-keys explicit-cols)
                        (vec explicit-cols))
                      (vec (sort (fn [a b] (php/strcmp (name a) (name b))) row-keys)))
-          rows     (map (fn [r] (vec (map (fn [k] (get r k)) cols))) vs)]
+          rows     (map (fn [r] (row-values-in-order r cols)) vs)]
       {:columns-sql (str "(" (str/join ", " (map ident cols)) ")")
        :values-sql  (str "VALUES " (str/join ", " (map row-placeholders rows)))
        :params      (vec (mapcat identity rows))})
