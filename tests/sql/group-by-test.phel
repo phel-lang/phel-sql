@@ -65,3 +65,23 @@
          (sql/format {:select [:region] :from [:t]
                       :group-by [[:rollup :region]]
                       :having [:> [:raw "COUNT(*)"] 1]}))))
+
+(deftest test-group-by-rollup-composite-item
+  (is (= ["SELECT a FROM t GROUP BY ROLLUP (a, (b, c))" []]
+         (sql/format {:select [:a] :from [:t]
+                      :group-by [[:rollup :a [:b :c]]]}))))
+
+(deftest test-group-by-cube-composite-item-same-names
+  (is (= ["SELECT a FROM t GROUP BY CUBE (a, (b, a))" []]
+         (sql/format {:select [:a] :from [:t]
+                      :group-by [[:cube :a [:b :a]]]}))))
+
+(deftest test-group-by-grouping-sets-nested-rollup
+  (is (= ["SELECT a FROM t GROUP BY GROUPING SETS ((a), ROLLUP (a, b))" []]
+         (sql/format {:select [:a] :from [:t]
+                      :group-by [[:grouping-sets [:a] [:rollup :a :b]]]}))))
+
+(deftest test-group-by-grouping-sets-list-set
+  (is (= ["SELECT a FROM t GROUP BY GROUPING SETS ((a, b), (a))" []]
+         (sql/format {:select [:a] :from [:t]
+                      :group-by [[:grouping-sets (list :a :b) (list :a)]]}))))

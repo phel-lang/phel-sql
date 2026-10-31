@@ -15,6 +15,7 @@
 (declare emit-set)
 (declare emit-order-fragments)
 (declare emit-null)
+(declare emit-grouping-form)
 
 ;; ===========================================================================
 ;; Load sub-files (each starts with `(in-ns phel.sql)`).

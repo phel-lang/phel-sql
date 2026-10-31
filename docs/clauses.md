@@ -116,7 +116,9 @@ Vector of columns (any identifier or tagged form).
 {:group-by [[:fn :date_trunc "month" :ts]]}
 ```
 
-`[:rollup ...]`, `[:cube ...]` and `[:grouping-sets ...]` are valid only as items of `:group-by`. Items inside them are ordinary identifiers, so tagged forms and their params work. `:rollup` and `:cube` need at least one column. `:grouping-sets` takes one vector per set; an empty vector renders `()`.
+`[:rollup ...]`, `[:cube ...]` and `[:grouping-sets ...]` are valid only as items of `:group-by`. Items inside them are ordinary identifiers, so tagged forms and their params work. `:rollup` and `:cube` need at least one column. `:grouping-sets` takes one vector or list per set; an empty one renders `()`. A set may also be a nested `:rollup`, `:cube` or `:grouping-sets` form. Inside `:rollup` and `:cube`, a plain vector such as `[:b :c]` renders as the composite `(b, c)`.
+
+The syntax follows Postgres and SQL Server. MySQL only supports `WITH ROLLUP`, and SQLite supports none of it.
 
 ```phel
 {:group-by [[:rollup :region :city]]}                 ; GROUP BY ROLLUP (region, city)

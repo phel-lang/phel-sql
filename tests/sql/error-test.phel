@@ -318,7 +318,7 @@
                         (sql/format {:select [:a] :from [:t] :group-by [[:grouping-sets]]}))))
 
 (deftest test-rejects-non-vector-grouping-set
-  (is (thrown-with-msg? \InvalidArgumentException ":grouping-sets expects each set to be a vector, got: :a"
+  (is (thrown-with-msg? \InvalidArgumentException ":grouping-sets expects each set to be a vector or list, got: :a"
                         (sql/format {:select [:a] :from [:t] :group-by [[:grouping-sets :a]]}))))
 
 (deftest test-rejects-nested-rollup
@@ -336,3 +336,11 @@
 (deftest test-rejects-grouping-sets-in-order-by
   (is (thrown? \InvalidArgumentException
                (sql/format {:select [:a] :from [:t] :order-by [[:grouping-sets [:a]]]}))))
+
+(deftest test-rejects-nested-form-with-nesting-message
+  (is (thrown-with-msg? \InvalidArgumentException "Nested :cube is not allowed inside :rollup, :cube or a grouping set, got: [:cube :a]"
+                        (sql/format {:select [:a] :from [:t] :group-by [[:rollup [:cube :a]]]}))))
+
+(deftest test-rejects-form-outside-group-by-with-location-message
+  (is (thrown-with-msg? \InvalidArgumentException ":rollup is only valid inside :group-by, got: [:rollup :a]"
+                        (sql/format {:select [[:rollup :a]] :from [:t]}))))
