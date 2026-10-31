@@ -27,16 +27,20 @@
 (defn- row-placeholders [row]
   (str "(" (str/join ", " (map (fn [_] "?") row)) ")"))
 
-(defn- check-keys-in-columns! [row-keys cols]
-  (let [allowed (set (map ident cols))
-        unknown (filter (fn [k] (not (contains? allowed (ident k)))) row-keys)]
+(defn- check-keys-in-columns! [rendered column-names]
+  (let [allowed (set column-names)
+        unknown (filter (fn [k] (not (contains? allowed (get rendered k)))) (keys rendered))]
     (when (seq unknown)
       (bad-arg (str "values map key(s) not listed in :columns: "
                     (str/join ", " (map show unknown)))))))
 
-(defn- row-values-in-order [row cols]
-  (let [by-ident (into {} (map (fn [k] [(ident k) (get row k)]) (keys row)))]
-    (vec (map (fn [c] (get by-ident (ident c))) cols))))
+(defn- row-values-by-name
+  "Values of `row` for each of `column-names`, matching keys by their rendered
+   identifier. `rendered` maps every key used in any row to that identifier, so
+   it is computed once per statement. A name the row lacks gives nil."
+  [row column-names rendered]
+  (let [by-name (into {} (map (fn [k] [(get rendered k) (get row k)]) (keys row)))]
+    (vec (map (fn [name] (get by-name name)) column-names))))
 
 (defn- check-rows-not-empty! [rows]
   (when (some (fn [r] (zero? (count r))) rows)
@@ -58,16 +62,32 @@
 (defn- sort-by-name [ks]
   (vec (sort (fn [a b] (php/strcmp (name a) (name b))) ks)))
 
+(defn- unique-key-per-column
+  "The one key that renders as each of `column-names`, or nil when a name is
+   spelled by more than one key (then rows must be matched by name)."
+  [column-names rendered row-keys]
+  (let [keys-by-name (group-by (fn [k] (get rendered k)) row-keys)]
+    (when (every? (fn [n] (<= (count (get keys-by-name n)) 1)) column-names)
+      (mapv (fn [n] (first (get keys-by-name n))) column-names))))
+
+(defn- map-row-values
+  "Values of each map row, in `column-names` order."
+  [vs column-names rendered row-keys]
+  (if-let [column-keys (unique-key-per-column column-names rendered row-keys)]
+    (map (fn [r] (vec (map (fn [k] (when k (get r k))) column-keys))) vs)
+    (map (fn [r] (row-values-by-name r column-names rendered)) vs)))
+
 (defn- normalise-map-rows [vs explicit-cols]
   (check-rows-not-empty! vs)
-  (let [row-keys (distinct (mapcat keys vs))
-        cols     (if explicit-cols
-                   (do (check-keys-in-columns! row-keys explicit-cols)
-                       (vec explicit-cols))
-                   (sort-by-name row-keys))
-        rows     (map (fn [r] (row-values-in-order r cols)) vs)]
-    (assoc (values-sql-and-params rows)
-           :columns-sql (str "(" (str/join ", " (map ident cols)) ")"))))
+  (let [row-keys     (distinct (mapcat keys vs))
+        rendered     (into {} (map (fn [k] [k (ident k)]) row-keys))
+        column-names (if explicit-cols
+                       (mapv ident explicit-cols)
+                       (mapv ident (sort-by-name row-keys)))]
+    (when explicit-cols
+      (check-keys-in-columns! rendered column-names))
+    (assoc (values-sql-and-params (map-row-values vs column-names rendered row-keys))
+           :columns-sql (str "(" (str/join ", " column-names) ")"))))
 
 (defn- normalise-vector-rows [vs explicit-cols]
   (check-rows-not-empty! vs)

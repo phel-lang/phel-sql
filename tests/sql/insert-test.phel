@@ -61,3 +61,11 @@
 (deftest test-insert-map-row-false-value-is-kept
   (is (= ["INSERT INTO t (a) VALUES (?)" [false]]
          (sql/format {:insert-into :t :columns [:a] :values [{:a false}]}))))
+
+(deftest test-insert-map-rows-spelling-a-column-differently-per-row
+  (is (= ["INSERT INTO t (a) VALUES (?), (?)" [1 2]]
+         (sql/format {:insert-into :t :columns [:a] :values [{:a 1} {"a" 2}]}))))
+
+(deftest test-insert-map-rows-namespaced-and-dotted-keys-match-one-column
+  (is (= ["INSERT INTO t (b.x) VALUES (?), (?)" [1 2]]
+         (sql/format {:insert-into :t :columns [:b.x] :values [{:b/x 1} {:b.x 2}]}))))

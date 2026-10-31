@@ -186,3 +186,7 @@
 (deftest test-rejects-keyword-namespace-with-injection
   (is (thrown? \InvalidArgumentException
                (sql/format {:select [(keyword "t; --" "id")] :from [:t]}))))
+
+(deftest test-rejects-keyword-identifier-with-newline
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [(keyword "a\n")] :from [:t]}))))

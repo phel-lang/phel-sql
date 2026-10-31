@@ -5,8 +5,8 @@
 
 (defn- show [x] (pr-str x))
 
-(defn- params-of [fragments] (mapcat (fn [[_ p]] p) fragments))
-(defn- sqls-of   [fragments] (map first fragments))
+(defn- params-of [fragments] (vec (mapcat (fn [[_ p]] p) fragments)))
+(defn- sqls-of   [fragments] (mapv first fragments))
 
 (defn- prefixed [prefix [sql params]]
   [(str prefix " " sql) params])
