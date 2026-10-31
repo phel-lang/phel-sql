@@ -91,6 +91,10 @@
          (not (contains? query :from))) :values-only
     :else                                                                                                                                                                                                                  :select))
 
+(def- select-allowed (set select-order))
+(def- update-allowed (set update-order))
+(def- delete-allowed (set delete-order))
+
 (defn- check-unknown! [query allowed]
   (let [unknown (->> (keys query)
                      (filter (fn [k] (not (contains? allowed k)))))]
@@ -98,20 +102,20 @@
       (bad-arg (str "Unknown clause(s) for this statement: "
                     (str/join ", " (map name unknown)))))))
 
-(defn- emit-ordered [query emitters clause-order]
-  (check-unknown! query (set clause-order))
+(defn- emit-ordered [query emitters clause-order allowed]
+  (check-unknown! query allowed)
   (let [present (filter (fn [k] (contains? query k)) clause-order)
         parts   (map (fn [k] ((get emitters k) (get query k))) present)]
     [(str/join " " (sqls-of parts)) (vec (params-of parts))]))
 
 (defn- emit-select-stmt [q]
   (mutex-select-mode! q)
-  (emit-ordered q select-emitters select-order))
+  (emit-ordered q select-emitters select-order select-allowed))
 
 (defn- emit-update-stmt [q]
   (when-not (contains? q :set) (bad-arg "update statement requires :set"))
-  (emit-ordered q update-emitters update-order))
-(defn- emit-delete-stmt [q] (emit-ordered q delete-emitters delete-order))
+  (emit-ordered q update-emitters update-order update-allowed))
+(defn- emit-delete-stmt [q] (emit-ordered q delete-emitters delete-order delete-allowed))
 
 (def- insert-allowed
   #{:with :with-recursive :insert-into :columns :values :returning

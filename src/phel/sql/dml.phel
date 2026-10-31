@@ -34,9 +34,16 @@
       (bad-arg (str "values map key(s) not listed in :columns: "
                     (str/join ", " (map show unknown)))))))
 
-(defn- row-values-in-order [row cols]
-  (let [by-ident (into {} (map (fn [k] [(ident k) (get row k)]) (keys row)))]
-    (vec (map (fn [c] (get by-ident (ident c))) cols))))
+(defn- row-key-for-column
+  "The key in `row-keys` that renders as the same identifier as `col`, or nil."
+  [row-keys col]
+  (let [target (ident col)]
+    (first (filter (fn [k] (= (ident k) target)) row-keys))))
+
+(defn- row-values-in-order
+  "Values of `row` for each of `row-keys-by-column` (nil for a column no row defines)."
+  [row row-keys-by-column]
+  (vec (map (fn [k] (when k (get row k))) row-keys-by-column)))
 
 (defn- check-rows-not-empty! [rows]
   (when (some (fn [r] (zero? (count r))) rows)
@@ -65,7 +72,8 @@
                    (do (check-keys-in-columns! row-keys explicit-cols)
                        (vec explicit-cols))
                    (sort-by-name row-keys))
-        rows     (map (fn [r] (row-values-in-order r cols)) vs)]
+        by-col   (map (fn [c] (row-key-for-column row-keys c)) cols)
+        rows     (map (fn [r] (row-values-in-order r by-col)) vs)]
     (assoc (values-sql-and-params rows)
            :columns-sql (str "(" (str/join ", " (map ident cols)) ")"))))
 

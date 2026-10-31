@@ -1,18 +1,18 @@
 (in-ns phel.sql)
-
 (def- expr-tags #{:raw :fn :cast :case :over :filter :lateral})
 
 (defn- subquery? [x] (map? x))
 (defn- tagged? [x] (and (vector? x) (keyword? (first x)) (contains? expr-tags (first x))))
 (defn- raw? [x] (and (vector? x) (= :raw (first x)) (= 2 (count x))))
 
-(def- identifier-segment-pattern "/^(?:[\\p{L}_$][\\p{L}\\p{N}_$]*|[0-9]+|\\*)$/u")
+(def- identifier-segment "(?:[\\p{L}_$][\\p{L}\\p{N}_$]*|[0-9]+|\\*)")
 
-(defn- check-identifier-segments!
+(def- identifier-pattern (str "/^" identifier-segment "(?:\\." identifier-segment ")*$/u"))
+
+(defn- check-identifier!
   "Throws unless every dot-separated part of `text` is a plain name, a number or `*`."
   [kw text]
-  (when-not (every? (fn [segment] (= 1 (php/preg_match identifier-segment-pattern segment)))
-                    (str/split text #"\."))
+  (when-not (= 1 (php/preg_match identifier-pattern text))
     (bad-arg (str "Invalid identifier: " (show kw)
                   ". Use a string or [:raw ...] for names outside letters, digits, _ and $"))))
 
@@ -23,8 +23,8 @@
   [x]
   (cond
     (keyword? x) (let [ns (namespace x)]
-                   (when ns (check-identifier-segments! x ns))
-                   (check-identifier-segments! x (name x))
+                   (when ns (check-identifier! x ns))
+                   (check-identifier! x (name x))
                    (if ns (str ns "." (name x)) (name x)))
     (string? x)  x
     :else        (bad-arg (str "Unsupported identifier: " (show x)))))
@@ -50,7 +50,7 @@
     :else         [(ident x) []]))
 
 (defn- idents+ [xs]
-  (let [parts (map ident+ xs)]
+  (let [parts (mapv ident+ xs)]
     [(str/join ", " (sqls-of parts)) (params-of parts)]))
 
 (defn- emit-ident-list
