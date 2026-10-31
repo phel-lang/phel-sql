@@ -1,14 +1,8 @@
 # Expression forms
 
-Every form in this page is a vector whose first element is one of the reserved
-expression tags. They are accepted in any position that takes an identifier or
-operand: `:select`, `:from`, `:group-by`, `:returning`, `:columns`, the LHS or
-RHS of any WHERE / SET comparison, inside `:in` / `:between`, in function
-arguments, and inside one another.
+Every form on this page is a vector that starts with a reserved tag. A tagged form works wherever an identifier or operand is accepted: `:select`, `:from`, `:group-by`, `:returning`, `:columns`, either side of a WHERE or SET comparison, inside `:in` and `:between`, in function arguments, and inside another tagged form.
 
-Each form below is followed by the SQL it produces. Tagged forms are completely
-composable: put a `:case` inside an `:over`, a `:filter` inside a `:fn`, a
-`:cast` inside an `:in`, and so on.
+Each example shows the SQL it produces. Forms nest: a `:case` inside an `:over`, a `:filter` inside a `:fn`, a `:cast` inside an `:in`.
 
 ## `[:raw "SQL"]`
 
@@ -21,8 +15,7 @@ Literal SQL fragment. The vector has exactly two elements and the second is a st
 
 ## `[:fn fname & args]`
 
-Function call. `fname` is a keyword or string; each arg goes through the
-expression pipeline.
+Function call. `fname` is a keyword or a string, and each argument is an operand.
 
 ```phel
 [:fn :now]                  ; -> now()
@@ -35,9 +28,7 @@ expression pipeline.
 
 ## `[:cast expr type]`
 
-`type` is a keyword or string. Keywords render bare (use `:INT`, `:UUID`, etc.
-for upper-case); strings render verbatim, allowing parameterised types like
-`"DECIMAL(10,2)"`.
+`type` is a keyword or a string. A keyword renders as written, so use `:INT` or `:UUID` for upper case. A string renders verbatim, which allows types such as `"DECIMAL(10,2)"`.
 
 ```phel
 [:cast :id :INT]            ; -> CAST(id AS INT)
@@ -47,8 +38,7 @@ for upper-case); strings render verbatim, allowing parameterised types like
 
 ## `[:case test then test then ... :else default]`
 
-Each `test` is a where-clause vector. Each `then` and the `:else` value are
-operands.
+Each `test` is a WHERE vector. Each `then` value and the `:else` value is an operand.
 
 ```phel
 [:case
@@ -59,14 +49,11 @@ operands.
 ;; params: ["a" "Active" "b" "Banned" "Unknown"]
 ```
 
-`:else` is optional; omit it for `CASE ... END` without a default. `:else`
-must be the final pair and must be followed by exactly one value.
+`:else` is optional. When present it comes last, followed by exactly one value.
 
 ## `[:over expr window-spec]`
 
-Window function. `expr` is typically `[:fn :row_number]`, `[:fn :rank]`,
-`[:fn :sum :col]`, etc. (any expression). `window-spec` is a map with up to
-three keys: `:partition-by`, `:order-by`, `:frame`.
+Window function. `expr` is any expression, usually `[:fn :row_number]` or `[:fn :sum :col]`. `window-spec` is a map with up to three keys: `:partition-by`, `:order-by` and `:frame`.
 
 ```phel
 [:over [:fn :row_number] {}]
@@ -79,7 +66,7 @@ three keys: `:partition-by`, `:order-by`, `:frame`.
 
 ### `:frame`
 
-A vector of frame tokens emitted in order. Tokens:
+A vector of frame tokens, emitted in order. `[:preceding N]` and `[:following N]` need a non-negative integer.
 
 | Token                    | SQL                  |
 |--------------------------|----------------------|
@@ -127,8 +114,7 @@ Aggregate `FILTER (WHERE ...)`. Combines with `:over` for window aggregates.
 
 ## `[:lateral subquery]`
 
-Marks a join or `:from` table as `LATERAL`. The subquery argument must be a
-map.
+Marks a join or `:from` table as `LATERAL`. The argument must be a subquery map.
 
 ```phel
 {:from [[:users :u]
@@ -138,8 +124,7 @@ map.
 ;; FROM users AS u, LATERAL (SELECT max(id) FROM orders WHERE user_id = u.id) AS o
 ```
 
-For a join, place the lateral table as the first half of the `[table on-clause]`
-pair:
+In a join, the lateral table is the first half of the `[table on-clause]` pair:
 
 ```phel
 {:join [[[:lateral {:select [:*] :from [:t]}] :x] [:raw "TRUE"]]}
@@ -150,13 +135,7 @@ pair:
 
 The compiler has two contexts:
 
-- **Identifier position**: select columns, from tables, group-by, returning,
-  columns. A bare string is a raw fragment; a bare keyword is an identifier; a
-  bare map is a subquery; a non-tagged vector is `[base alias]`.
-- **Operand position**: where/having LHS and RHS, set values, in / between
-  values, function arguments, case then-values. A bare string is a parameter
-  (bound as `?`); a bare keyword is an identifier; a bare map is a subquery.
+- **Identifier position**: select columns, tables, group-by, returning, columns. A string is written as is, a keyword is an identifier, a map is a subquery, and a two-element vector is `[base alias]`.
+- **Operand position**: either side of a WHERE or HAVING comparison, SET values, IN and BETWEEN values, function arguments, CASE results. A string is bound as `?`, a keyword is an identifier, a map is a subquery, and any other vector throws.
 
-Every tagged form behaves the same in both positions: it produces SQL plus the
-right params, and the surrounding context handles aliasing or placeholder
-placement.
+A tagged form behaves the same in both positions. See [Parameters](parameters.md) for the full table.

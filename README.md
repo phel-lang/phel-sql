@@ -1,6 +1,6 @@
 # phel-sql
 
-Data-driven SQL DSL for [Phel Lang](https://phel-lang.org/). Map in, `[sql params]` out. No database driver: the only job here is turning data into a parameterised query string.
+Data-driven SQL for [Phel](https://phel-lang.org/). You pass a map and get back `[sql params]`. It never connects to a database: pass the result to PDO or any other driver.
 
 Inspired by [HoneySQL](https://github.com/seancorfield/honeysql).
 
@@ -41,11 +41,18 @@ Requires PHP 8.5+ and `phel-lang/phel-lang` 0.54+.
    :limit    10})
 ```
 
-Pass the tuple to any PDO-like driver:
+Run the result with any PDO-like driver:
 
 ```php
 $pdo->prepare($sql)->execute($params);
 ```
+
+## Safety
+
+- **Values are always bound.** Every value becomes a `?` and lands in the params vector. Only `:limit` and `:offset` are written into the SQL, and only as non-negative integers.
+- **Keyword identifiers are checked.** `:users/id` and `:t.col` pass. A keyword with spaces, quotes or semicolons throws, so `(keyword user-input)` cannot inject SQL.
+- **Strings and `[:raw "..."]` are not checked.** A string in an identifier position, and every raw fragment, is written as is. Never build one from user input. See [Parameters](docs/parameters.md#raw-string) for the full list of positions.
+- **Bad input throws.** Unknown clauses, wrong argument counts, empty lists and malformed rows raise `InvalidArgumentException` with the offending value in the message.
 
 ## What it covers
 
@@ -72,12 +79,27 @@ Tagged expression forms usable anywhere an identifier or operand is accepted:
 | `[:filter expr where]`             | aggregate `FILTER (WHERE ...)`           |
 | `[:lateral subquery]`              | `LATERAL (...)`                          |
 
-Subqueries (maps) work anywhere an identifier or value is accepted. `[:raw "SQL"]` is the escape hatch for fragments the DSL does not yet cover. A string in an identifier position is also rendered verbatim: [see where](docs/parameters.md#raw-string).
+A map works as a subquery anywhere an identifier or value is accepted. Use `[:raw "SQL"]` for anything the DSL does not model yet.
 
 ## Docs
 
 - [Quickstart](docs/quickstart.md): three queries, end to end.
 - [Clauses](docs/clauses.md): every clause and operator.
 - [Expressions](docs/expressions.md): function calls, CAST, CASE, window, FILTER, LATERAL.
-- [Parameters](docs/parameters.md): keywords vs values, subqueries, raw fragments.
+- [Parameters](docs/parameters.md): identifiers, values, subqueries, raw fragments.
 - [Contributing](docs/contributing.md): repo layout, tests, adding a clause.
+- [Changelog](CHANGELOG.md)
+
+## Development
+
+```bash
+composer install
+composer test      # every deftest under tests/
+composer format    # format the Phel source
+```
+
+The library is pure Phel, so there is no PHP source and no PHPUnit. The [contributing guide](docs/contributing.md) covers adding clauses and operators.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

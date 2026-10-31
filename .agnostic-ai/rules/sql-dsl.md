@@ -7,8 +7,8 @@ globs: src/phel/sql/**,src/phel/sql.phel
 
 ## Architecture (two layers)
 
-1. **Expressions** — `ident+`, `operand`, `emit-tagged` handle anything inside a clause (identifiers, values, tagged forms, subqueries). Always return `[sql params]`.
-2. **Clauses** — emitter functions registered in dispatch maps in `src/phel/sql/dispatch.phel`:
+1. **Expressions**: `ident+`, `operand`, `emit-tagged` handle anything inside a clause (identifiers, values, tagged forms, subqueries). Always return `[sql params]`.
+2. **Clauses**: emitter functions registered in dispatch maps in `src/phel/sql/dispatch.phel`:
    - `select-emitters` / `select-order`
    - `update-emitters` / `update-order`
    - `delete-emitters` / `delete-order`
@@ -21,7 +21,7 @@ globs: src/phel/sql/**,src/phel/sql.phel
 - Every emitter returns `[sql params]`. Never concatenate a value into the SQL string.
 - Subqueries must recurse through `ident+` / `operand` / `compile-query`. Don't reimplement recursion at the call site.
 - Clause order is fixed by `*-order` vectors. The input map order does not matter (see `test-clause-order-is-fixed`).
-- The escape hatch is `[:raw "SQL"]` — never silently drop unknown shapes; throw with the offending value.
+- The escape hatch is `[:raw "SQL"]`: never silently drop unknown shapes; throw with the offending value.
 
 ## Adding a clause to SELECT
 

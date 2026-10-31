@@ -3,112 +3,124 @@
 ## Layout
 
 ```
-src/phel/sql.phel             ; public API: sql/format + private emitters
-tests/sql-test.phel      ; one deftest per clause and per error path
-docs/                    ; this directory
-phel-config.php          ; flat layout, library
-composer.json
+src/phel/sql.phel         public API (sql/format), forward declarations, loader
+src/phel/sql/             emitters, one file per concern
+tests/sql/*-test.phel     one file per clause or concern
+tests/e2e-test.phel       end-to-end scenarios
+docs/                     user docs, including this page
+phel-config.php          flat layout, library, namespace phel.sql
+release.sh               release automation
 ```
 
-That is the whole repo. Resist adding directories until they earn their keep.
+The sources sit under `src/phel/` because the compiled output (`out/phel/sql.php` and `out/phel/sql/*.php`) must mirror the namespace path. With any other layout the compiled `(load ...)` calls cannot find the sub-files.
 
-## Run tests
+Files in `src/phel/sql/`:
+
+| File | Holds |
+|------|-------|
+| `util.phel` | error helper, `show`, small shared helpers |
+| `ident.phel` | identifier rules, `ident`, `ident+`, `idents+` |
+| `expr.phel` | `operand` and the tagged forms (`:fn`, `:cast`, `:case`, `:over`, `:filter`, `:lateral`, `:raw`) |
+| `where.phel` | WHERE operators and their argument counts |
+| `order.phel`, `join.phel`, `cte.phel`, `clause.phel` | the matching clauses |
+| `dml.phel`, `upsert.phel` | INSERT rows, `:set`, ON CONFLICT, ON DUPLICATE KEY |
+| `dispatch.phel` | per-statement emitter maps, clause order, `compile-query` |
+
+## Set up
 
 ```bash
 composer install
-composer test
-```
-
-CI runs the same on PHP 8.5.
-
-## REPL
-
-```bash
+composer test        # every deftest under tests/
+composer format      # format the Phel source
 composer repl
 ```
+
+For focused work run one file:
+
+```bash
+vendor/bin/phel test tests/sql/where-test.phel
+```
+
+CI runs `composer test` on PHP 8.5. Run `composer format` before you push.
 
 ```phel
 phel:1> (require phel.sql :as sql)
 phel:2> (sql/format {:select [:id] :from [:users]})
 ```
 
-## Architecture
+## How the compiler is built
 
-Two layers:
+There are two layers.
 
-1. **Expressions** (`ident+`, `operand`, `emit-tagged`) handle anything that lives inside a clause: identifiers, values, tagged forms (`:fn`, `:cast`, `:case`, `:over`, `:filter`, `:lateral`, `:raw`), and subqueries. They all return `[sql params]` tuples.
+1. **Expressions** (`ident+`, `operand`, `emit-tagged`) handle anything that sits inside a clause: identifiers, values, tagged forms and subqueries. Each returns a `[sql params]` tuple.
 2. **Clauses** are emitter functions registered in dispatch maps:
 
 ```
-clause keyword  -->  emitter function  -->  [sql params]
+clause keyword  ->  emitter function  ->  [sql params]
 ```
 
-Per-statement dispatch maps and `*-order` vectors:
+Each statement kind has an emitter map and an order vector in `dispatch.phel`: `select-emitters` / `select-order`, `update-emitters` / `update-order`, `delete-emitters` / `delete-order`. The order vector fixes the SQL order, so the order of keys in the input map does not matter. INSERT and set operations are assembled by hand because their shapes are stricter. `statement-type` picks the kind from the keys present.
 
-```
-select-emitters / select-order
-update-emitters / update-order
-delete-emitters / delete-order
-```
+Subqueries work because `compile-query` is called from `ident+`, `operand`, the join and WITH helpers, and the LATERAL emitter. Parameters from a subquery flow back up in order.
 
-INSERT and set-ops are hand-assembled (they have stricter shape constraints). Statement kind is auto-detected by `statement-type` from the keys present.
+Rules that hold everywhere:
 
-Subqueries work because `compile-query` is called recursively from `ident+`, `operand`, the join helper, the WITH helper, and the LATERAL emitter. Anywhere a clause builds a query string, it also pulls params through.
+- Every emitter returns `[sql params]`. Never write a value into the SQL string.
+- Throw `InvalidArgumentException` through `bad-arg` for any input you do not recognise. Include the offending value. Never drop it silently.
+- Pure functions only: no I/O, no globals.
+- A helper used in another file goes into the `(declare ...)` block in `src/phel/sql.phel` first.
 
-## Add a new clause to SELECT
+## Add a clause to SELECT
 
-1. Write a private emitter in `src/phel/sql.phel`:
+1. Write a private emitter in the fitting file (usually `clause.phel`). It takes the clause value and returns `[sql params]`:
 
    ```phel
    (defn- emit-window [windows]
-     (let [[s p] (idents+ windows)]
-       [(str "WINDOW " s) p]))
+     (prefixed "WINDOW" (idents+ (non-empty-vector! :window windows))))
    ```
 
-   An emitter takes the clause's value and returns `[sql params]`.
+2. Register it in `select-emitters` and put its keyword at the right place in `select-order` (`dispatch.phel`).
+3. Add a `deftest` for each accepted shape and each error. Assert the full `[sql params]` tuple.
+4. Update `docs/clauses.md` and the README table.
 
-2. Register it:
+## Add a WHERE operator
 
-   ```phel
-   (def- select-emitters
-     {;; ...
-      :window emit-window})
-
-   (def- select-order
-     [;; ... order matters
-      :window
-      :order-by :limit :offset
-      :for :returning])
-   ```
-
-3. Add `deftest`s per accepted shape and per error it raises.
-
-4. Update `docs/clauses.md` and the README coverage table.
-
-## Add a new WHERE operator
-
-1. Add a row to `binary-ops` if it is a simple binary op, or extend the `case` in `emit-where` for special shapes.
-2. Add tests.
+1. Simple binary operator: add it to `binary-ops` in `where.phel`. Anything else: add a branch to the `case` in `emit-where` and an entry in `special-op-arity`.
+2. Add tests in `where-test.phel` and an error case in `error-test.phel`.
 3. Update `docs/clauses.md`.
 
-## Add a new tagged expression form
+## Add a tagged expression form
 
-1. Pick a tag keyword and add it to `expr-tags`.
-2. Write the private emitter (`emit-<thing>`) returning `[sql params]`.
-3. Add a branch in `emit-tagged`.
-4. Tests + `docs/expressions.md` entry.
+1. Add the tag to `expr-tags` in `ident.phel`.
+2. Write `emit-<thing>` returning `[sql params]` and add a branch in `emit-tagged` (`expr.phel`).
+3. Add tests in `expr-test.phel` and an entry in `docs/expressions.md`.
 
-The expression form is then automatically usable everywhere an identifier or operand is accepted, including inside other tagged forms.
+The form then works everywhere an identifier or operand is accepted, including inside other tagged forms.
 
-## Style
+## Tests
 
-- `defn-` / `def-` for everything that is not part of the public API.
-- Public functions get `:doc`, `:example`, `:see-also` metadata.
-- Pure functions only. No I/O, no PDO, no globals.
-- Phel naming: kebab-case for symbols.
-- Use threading (`->`, `->>`) and `case` for dispatch where it improves clarity.
+- One behavior per `deftest`. Split shapes instead of bundling them.
+- Assert the whole tuple. A test that checks only the SQL lets parameter bugs through.
+- Every thrown error gets a test in `error-test.phel`. Use `thrown?` for the class and `thrown-with-msg?` with the exact message when the text matters.
+- Test namespaces are `phel-sql-tests.sql.<topic>-test`.
+
+## Commits and pull requests
+
 - Conventional commits: `feat:`, `fix:`, `ref:`, `chore:`, `docs:`, `test:`, `ci:`.
+- Branch prefixes: `feat/`, `fix/`, `ref/`, `docs/`.
+- `feat:` and `fix:` changes add a line under `## [Unreleased]` in `CHANGELOG.md`.
+- Fill in the sections of the pull request template and pick one label.
+
+## AI tool config
+
+Instructions for AI coding tools live in `.agnostic-ai/` and are managed with [agnostic-ai](https://agnostic-ai.org/). The files in `.claude/`, `.codex/`, `.agents/`, `CLAUDE.md` and `AGENTS.md` are generated and ignored by Git. After cloning, run:
+
+```bash
+agnostic-ai sync
+```
+
+Edit the sources in `.agnostic-ai/`, then sync again. `agnostic-ai sync --check` fails when generated files are out of date.
 
 ## Reporting bugs
 
-Open an issue with the input map, the expected output, and what you actually got. A failing `deftest` is the gold standard.
+Open an issue with the input map, the output you expected and the output you got. A failing `deftest` is the best report.

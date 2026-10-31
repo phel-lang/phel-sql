@@ -1,14 +1,14 @@
 # phel-sql docs
 
-A small library with a focused job: turn a Phel map into a `[sql params]` tuple. Pure functions, no I/O, no database driver.
+Turn a Phel map into a `[sql params]` tuple. Pure functions, no I/O, no database driver.
 
 ## Start here
 
-- **[Quickstart](quickstart.md)**: get a query running in 60 seconds.
-- **[Clauses](clauses.md)**: every clause, every operator, every error path.
+- **[Quickstart](quickstart.md)**: three queries, end to end.
+- **[Clauses](clauses.md)**: every clause, every operator, every error.
 - **[Expressions](expressions.md)**: tagged forms (`:fn`, `:cast`, `:case`, `:over`, `:filter`, `:lateral`, `:raw`).
 - **[Parameters](parameters.md)**: identifier rules, values, subqueries, raw fragments.
-- **[Contributing](contributing.md)**: repo layout, how to add a clause or operator.
+- **[Contributing](contributing.md)**: repo layout, tests, how to add a clause or operator.
 
 ## Mental model
 
@@ -16,7 +16,7 @@ A small library with a focused job: turn a Phel map into a `[sql params]` tuple.
 phel map  ->  sql/format  ->  [sql-string, params-vector]
 ```
 
-The function does only that. It does not execute, prepare, escape, connect to a database, or know which dialect you target.
+`sql/format` does only that. It does not run queries, connect to a database, quote identifiers or know your SQL dialect.
 
 ## Statement detection
 
@@ -43,7 +43,7 @@ Each kind has its own permitted clauses. Mixing them raises `InvalidArgumentExce
 | Join ON clause                                      | yes       |
 | Join USING clause                                   | yes       |
 | LATERAL joins / from                                | yes       |
-| WHERE: 16 operators incl. EXISTS, NOT IN, ILIKE     | yes       |
+| WHERE: 21 operators incl. EXISTS, NOT IN, ILIKE     | yes       |
 | GROUP BY, HAVING                                    | yes       |
 | ORDER BY (ASC / DESC / NULLS FIRST / NULLS LAST)    | yes       |
 | LIMIT, OFFSET                                       | yes       |
@@ -69,4 +69,4 @@ Each kind has its own permitted clauses. Mixing them raises `InvalidArgumentExce
 | OFFSET ... FETCH (SQL standard form)                | not yet   |
 | Named parameters (`:foo`)                           | not yet   |
 
-Window functions and on-conflict cover the most-asked features. MERGE, grouping sets, and dialect JSON ops are reachable through `[:raw "..."]` until first-class support lands.
+Use `[:raw "..."]` for MERGE, grouping sets and dialect-specific JSON operators until they are supported.

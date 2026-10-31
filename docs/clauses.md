@@ -9,7 +9,9 @@ Every clause emits SQL in a fixed order, regardless of map insertion order.
 - Top-level VALUES: `{:values [[...] ...]}` with no other keys.
 - Set ops: `{:union [...]}` (and `:union-all`, `:intersect`, `:except`) with no other keys.
 
-Any place a clause accepts an identifier or value also accepts the [tagged expression forms](expressions.md) (`[:raw ...]`, `[:fn ...]`, `[:cast ...]`, `[:case ...]`, `[:over ...]`, `[:filter ...]`, `[:lateral ...]`) and bare subquery maps.
+Wherever a clause accepts an identifier or value it also accepts the [tagged expression forms](expressions.md) and subquery maps.
+
+Clauses that list columns or tables (`:select`, `:select-distinct`, `:from`, `:group-by`, `:returning`, `:order-by`, `:columns`) take a non-empty vector or list. An empty or non-sequential value throws.
 
 ## SELECT
 
@@ -135,7 +137,7 @@ Vector of items.
 {:order-by [[[:fn :length :name] :asc]]} ; ORDER BY length(name) ASC
 ```
 
-The optional third element is `:nulls-first` or `:nulls-last`; it requires the direction to be present.
+The optional third element is `:nulls-first` or `:nulls-last`. It needs the direction before it.
 
 ### `:limit` / `:offset`
 
@@ -143,7 +145,7 @@ Non-negative integers, inlined.
 
 ### `:for`
 
-Lock hint. Mode: `:update`, `:share`, `:no-key-update`, `:key-share`. Optional second element: `:nowait` or `:skip-locked`.
+Row lock. The mode is `:update`, `:share`, `:no-key-update` or `:key-share`. An optional second element is `:nowait` or `:skip-locked`.
 
 ```phel
 {:for :update}
@@ -174,11 +176,11 @@ Table keyword or `[table alias]`.
 
 ### `:columns` (optional)
 
-Explicit column list for positional vector rows. Omit when rows are maps.
+Explicit column list. With vector rows, every row must have exactly this many values. With map rows, the values are written in `:columns` order and a key that is not listed throws. Omit it to use the keys of the maps.
 
 ### `:values`
 
-Either a vector of vectors (positional) or a vector of maps. With maps, columns are the union of keys, alphabetised for determinism, missing keys producing `nil` params.
+A vector of vectors (positional) or a vector of maps, never a mix. Rows must not be empty, and vector rows must all have the same width. Without `:columns`, map rows use the union of their keys in alphabetical order, and a row that lacks a key gets a `nil` param.
 
 ```phel
 {:insert-into :users
@@ -201,9 +203,11 @@ Target shapes:
 Then one of:
 
 - `:do-nothing true`
-- `:do-update-set <map>` (with optional `:do-update-where <where>`)
+- `:do-update-set <map>`, with an optional `:do-update-where <where>`
 
-Optional `:on-conflict-where <where>` for partial-index conflicts.
+An optional `:on-conflict-where <where>` handles partial-index conflicts.
+
+`:on-conflict-where`, `:do-nothing`, `:do-update-set` and `:do-update-where` throw without `:on-conflict`. `:do-update-where` also needs `:do-update-set`.
 
 ```phel
 {:insert-into :users
@@ -258,7 +262,7 @@ A map of column to value. Cannot be combined with `:on-conflict`.
  :where [:= :id 1]}
 ```
 
-`:set` is required. It is a map of column to value. Keyword values become column copies. Raw / tagged forms work. The map is sorted alphabetically for deterministic output.
+`:set` is required. It is a map of column to value. A keyword value copies another column, and tagged forms work as values. Columns are written in alphabetical order so the output is stable.
 
 UPDATE accepts `:from`, `:where`, `:order-by`, `:limit`, `:returning`.
 
@@ -270,7 +274,7 @@ UPDATE accepts `:from`, `:where`, `:order-by`, `:limit`, `:returning`.
 
 ## Top-level VALUES
 
-When `:values` is the only relevant key (no select/from/dml keys), the result is a standalone `VALUES` expression.
+When `:values` is the only key, the result is a standalone `VALUES` expression.
 
 ```phel
 {:values [[1 "a"] [2 "b"]]}
@@ -279,7 +283,7 @@ When `:values` is the only relevant key (no select/from/dml keys), the result is
 
 ## Set operations
 
-`{:union [...]}`, `:union-all`, `:intersect`, `:except`. Value is a vector of two or more SELECT maps. The outer map must contain only that key.
+`:union`, `:union-all`, `:intersect` and `:except` take a vector of two or more queries. The outer map holds only that key.
 
 ```phel
 {:union [{:select [:id] :from [:a]}
@@ -289,26 +293,17 @@ When `:values` is the only relevant key (no select/from/dml keys), the result is
 
 ## Errors
 
-Every malformed input raises `InvalidArgumentException`. Highlights:
+Malformed input throws `InvalidArgumentException`. The message names the problem and shows the offending value as a Phel literal, for example `Unknown where operator: :bogus`.
 
-- non-map input
-- unknown clause for the detected statement kind
-- two of `:select` / `:select-distinct` / `:select-distinct-on` together
-- unknown WHERE operator, wrong argument count, or non-vector WHERE body
-- empty `:in` list (without subquery)
-- bad order direction / nulls modifier
-- negative or non-integer `:limit` / `:offset`
-- unsupported identifier (e.g. a number)
-- bad lock mode / lock spec
-- malformed CTE / `:select-distinct-on` map
-- INSERT missing `:insert-into` or `:values`
-- mixed-shape `:values`
-- empty / non-map `:set`
-- ON CONFLICT without `:do-nothing` or `:do-update-set`
-- both `:do-nothing` and `:do-update-set`
-- both `:on-conflict` and `:on-duplicate-key-update`
-- empty `:on-duplicate-key-update`
-- empty `[:using]`
-- unknown frame token in `:over`
-- empty / odd-pair `:case` / misplaced `:else`
-- set-op with extras or fewer than two queries
+- Input that is not a map, or an unknown clause for the statement kind.
+- More than one of `:select`, `:select-distinct` and `:select-distinct-on`.
+- An unsupported identifier, such as a number, or a keyword with characters other than letters, digits, `_`, `$` and `.`.
+- An empty or non-sequential value for a list clause.
+- WHERE: an unknown operator, a wrong argument count, a body that is not a vector, an empty `:in` list, an untagged vector as an operand.
+- A bad order direction or nulls modifier, a bad lock mode, a negative or non-integer `:limit` or `:offset`.
+- A malformed CTE, `:select-distinct-on` map, `[:raw ...]`, alias, `:case`, window spec or frame token.
+- INSERT: missing `:insert-into` or `:values`, mixed, empty or ragged rows, a row width that differs from `:columns`, a map key missing from `:columns`.
+- Upsert: a key without `:on-conflict`, `:on-conflict` without `:do-nothing` or `:do-update-set`, both `:do-nothing` and `:do-update-set`, both `:on-conflict` and `:on-duplicate-key-update`.
+- UPDATE without `:set`, an empty or non-map `:set` or `:on-duplicate-key-update`.
+- An empty `[:using]`.
+- A set operation with other keys or fewer than two queries.

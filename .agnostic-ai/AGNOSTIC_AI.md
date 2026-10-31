@@ -7,20 +7,20 @@ Data-driven SQL DSL for [Phel Lang](https://phel-lang.org/). Pure Phel. Map in, 
 ```
 src/phel/sql.phel             public API + cross-file declarations + multi-file loader
 src/phel/sql/                 emitters split by concern (clause, where, join, dml, expr, ...)
-tests/sql/*-test.phel    deftest per clause / per error path
-tests/e2e-test.phel      end-to-end black-box scenarios
-docs/                    user-facing docs (quickstart, clauses, expressions, parameters)
-release.sh               release automation (CHANGELOG → tag → GitHub release)
-phel-config.php          flat layout, library, namespace `phel.sql`
+tests/sql/*-test.phel         deftest per clause / per error path
+tests/e2e-test.phel           end-to-end black-box scenarios
+docs/                         user docs (quickstart, clauses, expressions, parameters, contributing)
+release.sh                    release automation (CHANGELOG, tag, GitHub release)
+phel-config.php               flat layout, library, namespace `phel.sql`
 ```
 
 **Two-layer design** (see `docs/contributing.md`):
 
-1. **Expressions** — `ident+`, `operand`, `emit-tagged` handle identifiers, values, tagged forms (`:fn`, `:cast`, `:case`, `:over`, `:filter`, `:lateral`, `:raw`), and subqueries. All return `[sql params]` tuples.
-2. **Clauses** — emitter functions registered in dispatch maps:
+1. **Expressions**: `ident+`, `operand`, `emit-tagged` handle identifiers, values, tagged forms (`:fn`, `:cast`, `:case`, `:over`, `:filter`, `:lateral`, `:raw`), and subqueries. All return `[sql params]` tuples.
+2. **Clauses**: emitter functions registered in dispatch maps:
 
 ```
-clause keyword → emitter fn → [sql params]
+clause keyword -> emitter fn -> [sql params]
 ```
 
 Per-statement maps and order vectors live in `src/phel/sql/dispatch.phel`:
@@ -29,8 +29,8 @@ Per-statement maps and order vectors live in `src/phel/sql/dispatch.phel`:
 ## Testing
 
 ```bash
-composer test     # vendor/bin/phel test  — runs every deftest under tests/
-composer format   # vendor/bin/phel format — auto-format Phel source
+composer test     # vendor/bin/phel test: runs every deftest under tests/
+composer format   # vendor/bin/phel format: auto-format Phel source
 composer repl     # interactive REPL
 ```
 
@@ -38,12 +38,12 @@ No PHP source. No PHPUnit. Single test runner, single formatter.
 
 ### Test scope
 
-| Changed                  | Command                                  |
-|--------------------------|------------------------------------------|
-| `src/phel/sql.phel`           | `composer test`                           |
-| `src/phel/sql/<file>.phel`    | `vendor/bin/phel test tests/sql/<file>-test.phel` for focused work |
-| `tests/sql/<x>-test.phel`| `vendor/bin/phel test tests/sql/<x>-test.phel` |
-| Anything user-facing     | Update `CHANGELOG.md` under `## [Unreleased]` |
+| Changed                    | Command                                                              |
+|----------------------------|----------------------------------------------------------------------|
+| `src/phel/sql.phel`        | `composer test`                                                      |
+| `src/phel/sql/<file>.phel` | `vendor/bin/phel test tests/sql/<file>-test.phel` for focused work   |
+| `tests/sql/<x>-test.phel`  | `vendor/bin/phel test tests/sql/<x>-test.phel`                       |
+| Anything user-facing       | Update `CHANGELOG.md` under `## [Unreleased]`                        |
 
 ## Git
 
@@ -55,7 +55,7 @@ No PHP source. No PHPUnit. Single test runner, single formatter.
 ## Adding stuff (see `docs/contributing.md`)
 
 - **New SELECT clause** → emitter in `src/phel/sql/clause.phel`, register in dispatch map + order vector, tests per shape and per error, update `docs/clauses.md` + README table.
-- **New WHERE op** → add to `binary-ops` or extend `case` in `emit-where`, tests, doc.
+- **New WHERE op** → add to `binary-ops` or extend `case` in `emit-where` and `special-op-arity`, tests, doc.
 - **New tagged form** → add tag to `expr-tags`, write `emit-<thing>`, branch in `emit-tagged`, tests, `docs/expressions.md` entry.
 
 ## Style
@@ -63,3 +63,10 @@ No PHP source. No PHPUnit. Single test runner, single formatter.
 - `defn-` / `def-` for everything not in public API. Public fns get `:doc`, `:example`, `:see-also`.
 - Pure functions only. No I/O, no PDO, no globals.
 - kebab-case symbols. Threading (`->`, `->>`) and `case` for dispatch when it improves clarity.
+
+## Gotchas
+
+- Sources live under `src/phel/` so the compiled output mirrors the namespace path. Moving them breaks `(load ...)` in built code.
+- Every error is an `InvalidArgumentException` raised with `bad-arg`. Include the offending value (`show`) and never drop unknown input silently.
+- `thrown-with-msg?` in phel.test compares the message for equality. It does not apply a regex.
+- Generated files (`CLAUDE.md`, `AGENTS.md`, `.claude/`, `.codex/`, `.agents/`) are ignored. Edit `.agnostic-ai/` and run `agnostic-ai sync`.
