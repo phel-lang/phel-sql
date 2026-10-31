@@ -345,7 +345,6 @@
   (is (thrown-with-msg? \InvalidArgumentException ":rollup is only valid inside :group-by, got: [:rollup :a]"
                         (sql/format {:select [[:rollup :a]] :from [:t]}))))
 
-
 (deftest test-malformed-clause-still-throws-next-to-nil-items
   (is (thrown-with-msg? \InvalidArgumentException "where operator := expects 2 argument(s), got: 1"
                         (sql/format {:select [:id] :from [:t]
