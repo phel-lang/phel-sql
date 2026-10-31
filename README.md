@@ -84,6 +84,7 @@ A map works as a subquery anywhere an identifier or value is accepted. Use `[:ra
 ## Docs
 
 - [Quickstart](docs/quickstart.md): three queries, end to end.
+- [Cookbook](docs/cookbook.md): recipes, running queries with PDO, FAQ.
 - [Clauses](docs/clauses.md): every clause and operator.
 - [Expressions](docs/expressions.md): function calls, CAST, CASE, window, FILTER, LATERAL.
 - [Parameters](docs/parameters.md): identifiers, values, subqueries, raw fragments.

@@ -198,3 +198,133 @@
              (is (string? s))
              (is (vector? p))
              (is (= [1] p)))))
+
+;; ===========================================================================
+;; Cookbook (docs/cookbook.md). Each deftest holds one snippet from the doc.
+;; ===========================================================================
+
+(defn- search-users [{:keys [status min-age name]}]
+  {:select [:id :name]
+   :from   [:users]
+   :where  [:and
+            (when status [:= :status status])
+            (when min-age [:>= :age min-age])
+            (when name [:ilike :name (str "%" name "%")])]})
+
+(deftest test-cookbook-filters-all-set
+  (is (= ["SELECT id, name FROM users WHERE (status = ?) AND (age >= ?) AND (name ILIKE ?)"
+          ["active" 18 "%ann%"]]
+         (sql/format (search-users {:status "active" :min-age 18 :name "ann"})))))
+
+(deftest test-cookbook-filters-one-set
+  (is (= ["SELECT id, name FROM users WHERE status = ?" ["active"]]
+         (sql/format (search-users {:status "active"})))))
+
+(deftest test-cookbook-filters-none-set
+  (is (= ["SELECT id, name FROM users" []]
+         (sql/format (search-users {})))))
+
+(deftest test-cookbook-pagination
+  (is (= ["SELECT id, name FROM users WHERE status = ? ORDER BY created_at DESC, id DESC LIMIT 20 OFFSET 40"
+          ["active"]]
+         (sql/format
+          {:select   [:id :name]
+           :from     [:users]
+           :where    [:= :status "active"]
+           :order-by [[:created_at :desc] [:id :desc]]
+           :limit    20
+           :offset   40}))))
+
+(deftest test-cookbook-upsert
+  (is (= ["INSERT INTO users (email, name) VALUES (?, ?) ON CONFLICT (email) DO UPDATE SET name = ?"
+          ["a@x.com" "alice" "alice"]]
+         (sql/format
+          {:insert-into   :users
+           :values        [{:email "a@x.com" :name "alice"}]
+           :on-conflict   [:email]
+           :do-update-set {:name "alice"}}))))
+
+(deftest test-cookbook-bulk-insert
+  (is (= ["INSERT INTO users (email, name) VALUES (?, ?), (?, ?)"
+          ["a@x.com" "alice" "b@x.com" "bob"]]
+         (sql/format
+          {:insert-into :users
+           :columns     [:email :name]
+           :values      [["a@x.com" "alice"] ["b@x.com" "bob"]]}))))
+
+(deftest test-cookbook-insert-select
+  (is (= ["INSERT INTO archive (id, name) SELECT id, name FROM users WHERE created_at < ?"
+          ["2020-01-01"]]
+         (sql/format
+          {:insert-into :archive
+           :columns     [:id :name]
+           :query       {:select [:id :name]
+                         :from   [:users]
+                         :where  [:< :created_at "2020-01-01"]}}))))
+
+(deftest test-cookbook-cte
+  (is (= ["WITH active AS (SELECT id FROM users WHERE status = ?) SELECT o.id, o.total FROM orders AS o JOIN active AS a ON o.user_id = a.id"
+          ["active"]]
+         (sql/format
+          {:with   [[:active {:select [:id] :from [:users] :where [:= :status "active"]}]]
+           :select [:o/id :o/total]
+           :from   [[:orders :o]]
+           :join   [[:active :a] [:= :o/user_id :a/id]]}))))
+
+(deftest test-cookbook-window-ranking
+  (is (= ["SELECT id, dept, salary, rank() OVER (PARTITION BY dept ORDER BY salary DESC) AS rk FROM employees"
+          []]
+         (sql/format
+          {:select [:id :dept :salary
+                    [[:over [:fn :rank] {:partition-by [:dept]
+                                         :order-by     [[:salary :desc]]}]
+                     :rk]]
+           :from   [:employees]}))))
+
+(deftest test-cookbook-named-window
+  (is (= ["SELECT id, rank() OVER w AS rk FROM employees WINDOW w AS (PARTITION BY dept ORDER BY salary DESC)"
+          []]
+         (sql/format
+          {:select [:id [[:over [:fn :rank] :w] :rk]]
+           :from   [:employees]
+           :window [[:w {:partition-by [:dept] :order-by [[:salary :desc]]}]]}))))
+
+(deftest test-cookbook-reserved-words
+  (is (= ["SELECT \"user\", \"order\", id FROM \"group\" WHERE \"order\" = ? ORDER BY \"order\" DESC"
+          [1]]
+         (sql/format
+          {:select   ["\"user\"" "\"order\"" :id]
+           :from     ["\"group\""]
+           :where    [:= [:raw "\"order\""] 1]
+           :order-by [["\"order\"" :desc]]}))))
+
+(deftest test-cookbook-reserved-word-in-where-is-a-value
+  (is (= ["SELECT id FROM t WHERE ? = ?" ["\"order\"" 1]]
+         (sql/format {:select [:id] :from [:t] :where [:= "\"order\"" 1]}))))
+
+(deftest test-cookbook-json-param
+  (is (= ["INSERT INTO events (kind, payload) VALUES (?, ?)"
+          ["signup" "{\"plan\":\"pro\"}"]]
+         (sql/format
+          {:insert-into :events
+           :columns     [:kind :payload]
+           :values      [["signup" (php/json_encode (php-associative-array "plan" "pro"))]]}))))
+
+(deftest test-cookbook-faq-kebab-keyword-fails
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "Invalid identifier: :created-at. Use a string or [:raw ...] for names outside letters, digits, _ and $"
+                        (sql/format {:select [:id] :from [:users] :order-by [[:created-at :desc]]}))))
+
+(deftest test-cookbook-migrate-raw-step-one
+  (is (= ["SELECT id, name FROM users WHERE lower(email) = ?" ["a@x.com"]]
+         (sql/format
+          {:select ["id, name"]
+           :from   ["users"]
+           :where  [:= [:raw "lower(email)"] "a@x.com"]}))))
+
+(deftest test-cookbook-migrate-raw-step-two
+  (is (= ["SELECT id, name FROM users WHERE lower(email) = ?" ["a@x.com"]]
+         (sql/format
+          {:select [:id :name]
+           :from   [:users]
+           :where  [:= [:fn :lower :email] "a@x.com"]}))))
