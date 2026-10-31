@@ -52,7 +52,13 @@
   (when-let [emitted (emit-where-or-nil w)]
     (prefixed prefix emitted)))
 
+(defn- emit-mutation-where [kind w]
+  (or (emit-optional-where "WHERE" w)
+      (bad-arg (str kind " statement has an empty :where; omit :where to " kind " every row"))))
+
 (defn- emit-where-clause    [w]    (emit-optional-where "WHERE" w))
+(defn- emit-update-where-clause [w] (emit-mutation-where "update" w))
+(defn- emit-delete-where-clause [w] (emit-mutation-where "delete" w))
 (defn- emit-having-clause   [w]    (emit-optional-where "HAVING" w))
 
 ;; ===========================================================================

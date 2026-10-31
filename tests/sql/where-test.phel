@@ -210,10 +210,10 @@
   (is (= ["SELECT a FROM t GROUP BY a" []]
          (sql/format {:select [:a] :from [:t] :group-by [:a] :having [:or nil nil]}))))
 
-(deftest test-update-where-nil-is-omitted
+(deftest test-update-without-where-still-works
   (is (= ["UPDATE t SET a = ?" [1]]
-         (sql/format {:update :t :set {:a 1} :where nil}))))
+         (sql/format {:update :t :set {:a 1}}))))
 
-(deftest test-delete-where-all-nil-is-omitted
+(deftest test-delete-without-where-still-works
   (is (= ["DELETE FROM t" []]
-         (sql/format {:delete-from :t :where [:and nil]}))))
+         (sql/format {:delete-from :t}))))

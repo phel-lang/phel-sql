@@ -362,3 +362,32 @@
 (deftest test-empty-and-still-throws
   (is (thrown-with-msg? \InvalidArgumentException "AND expects at least one clause"
                         (sql/format {:select [:id] :from [:t] :where [:and]}))))
+
+(deftest test-update-where-nil-throws
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "update statement has an empty :where; omit :where to update every row"
+                        (sql/format {:update :t :set {:a 1} :where nil}))))
+
+(deftest test-update-where-all-nil-throws
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "update statement has an empty :where; omit :where to update every row"
+                        (sql/format {:update :t :set {:a 1} :where [:and nil nil]}))))
+
+(deftest test-delete-where-nil-throws
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "delete statement has an empty :where; omit :where to delete every row"
+                        (sql/format {:delete-from :t :where nil}))))
+
+(deftest test-delete-where-all-nil-throws
+  (is (thrown-with-msg? \InvalidArgumentException
+                        "delete statement has an empty :where; omit :where to delete every row"
+                        (sql/format {:delete-from :t :where [:or nil [:and nil]]}))))
+
+(deftest test-do-update-where-all-nil-throws
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:insert-into :t :values [{:id 1}] :on-conflict [:id]
+                            :do-update-set {:id 1} :do-update-where [:and nil]}))))
+
+(deftest test-join-on-all-nil-throws
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:a] :join [[:b] [:and nil]]}))))

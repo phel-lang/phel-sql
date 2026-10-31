@@ -119,8 +119,9 @@ Argument counts are checked. Binary operators, `:in` and `:not-in` take 2 argume
 
 - One remaining item renders without parentheses, because the parentheses only separate siblings.
 - A nested `:and` or `:or` whose items are all `nil` is skipped like a `nil`.
-- A `:where` or `:having` that is `nil`, or that ends up empty, is left out of the statement. This holds for SELECT, UPDATE and DELETE. Without a `:where`, UPDATE and DELETE touch every row.
-- Only `:and` and `:or` items and the `:where` / `:having` values may be `nil`. A `nil` operand of another operator, `:not`, a join `:on`, or `:do-update-where` still throws.
+- In SELECT, a `:where` or `:having` that is `nil`, or that ends up empty, is left out of the statement.
+- In UPDATE and DELETE, a `:where` that is present but `nil` or empty throws, so a filter that came out empty never touches every row by accident. Leave `:where` out to affect every row.
+- Only `:and` and `:or` items and the SELECT `:where` / `:having` values may be `nil`. A `nil` or all-`nil` operand of another operator, `:not`, a join `:on`, or `:do-update-where` still throws.
 
 ### `:group-by`
 
@@ -358,7 +359,7 @@ Malformed input throws `InvalidArgumentException`. The message names the problem
 - More than one of `:select`, `:select-distinct` and `:select-distinct-on`.
 - An unsupported identifier, such as a number, or a keyword with characters other than letters, digits, `_`, `$` and `.`.
 - An empty or non-sequential value for a list clause.
-- WHERE: an unknown operator, a wrong argument count, a body that is not a vector, an empty `:in` list, an untagged vector as an operand, a `nil` where clause outside `:and` / `:or` / `:where` / `:having` (for example `[:not nil]`), a malformed clause such as `[:= nil]`, an `:and` or `:or` with no items, and `:not` over an `:and` or `:or` whose items are all `nil`.
+- WHERE: an unknown operator, a wrong argument count, a body that is not a vector, an empty `:in` list, an untagged vector as an operand, a `nil` where clause outside `:and` / `:or` / `:where` / `:having` (for example `[:not nil]`), an empty `:where` in UPDATE or DELETE, a malformed clause such as `[:= nil]`, an `:and` or `:or` with no items, and `:not` over an `:and` or `:or` whose items are all `nil`.
 - A bad order direction or nulls modifier, a bad lock mode, a negative or non-integer `:limit` or `:offset`.
 - A malformed CTE, `:select-distinct-on` map, `[:raw ...]`, alias, `:case`, window spec, `:window` entry or name, `[:over ...]` window argument or frame token.
 - `:group-by`: an empty `:rollup`, `:cube` or `:grouping-sets`, a grouping set that is not a vector, or one of these forms used outside `:group-by`.

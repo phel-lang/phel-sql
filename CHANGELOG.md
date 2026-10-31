@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - INSERT ... SELECT: `:query` takes a SELECT, VALUES or set operation query in place of `:values`, and works with `:with`, upserts and `:returning` (#45)
 - `:window` clause for named windows, `[:over expr :name]` to use one, and a `:window` key in window specs to extend one (#50)
 - `[:rollup ...]`, `[:cube ...]` and `[:grouping-sets ...]` are accepted as `:group-by` items (#49)
-- `nil` items inside `:and` and `:or` are skipped, and a `:where` or `:having` that is `nil` or ends up empty is omitted, so optional filters work with `when` (#42)
+- `nil` items inside `:and` and `:or` are skipped, and a SELECT `:where` or `:having` that is `nil` or ends up empty is omitted, so optional filters work with `when`. An empty `:where` in UPDATE or DELETE throws (#42)
 
 ### Fixed
 

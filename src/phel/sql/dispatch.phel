@@ -40,7 +40,7 @@
    :update          emit-update
    :set             emit-set
    :from            emit-from
-   :where           emit-where-clause
+   :where           emit-update-where-clause
    :order-by        emit-order-by
    :limit           emit-limit
    :returning       emit-returning})
@@ -52,7 +52,7 @@
   {:with            emit-with
    :with-recursive  emit-with-recursive
    :delete-from     emit-delete-from
-   :where           emit-where-clause
+   :where           emit-delete-where-clause
    :order-by        emit-order-by
    :limit           emit-limit
    :returning       emit-returning})
