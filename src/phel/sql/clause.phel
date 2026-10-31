@@ -7,7 +7,46 @@
 (defn- emit-select          [cols] (emit-ident-list "SELECT"          :select          cols))
 (defn- emit-select-distinct [cols] (emit-ident-list "SELECT DISTINCT" :select-distinct cols))
 (defn- emit-from            [xs]   (emit-ident-list "FROM"            :from            xs))
-(defn- emit-group-by        [cols] (emit-ident-list "GROUP BY"        :group-by        cols))
+(defn- nested-grouping-error [x]
+  (bad-arg (str "Nested " (first x) " is not allowed inside :rollup, :cube or a grouping set, got: " (show x))))
+
+(defn- emit-rollup-item
+  "A plain untagged vector inside ROLLUP / CUBE is a composite column list."
+  [x]
+  (cond
+    (grouping-form? x)                  (nested-grouping-error x)
+    (and (vector? x) (not (tagged? x))) (let [[sql params] (idents+ x)] [(str "(" sql ")") params])
+    :else                               (ident+ x)))
+
+(defn- emit-set-item [x]
+  (if (grouping-form? x) (nested-grouping-error x) (ident+ x)))
+
+(defn- emit-grouping-set [set]
+  (cond
+    (grouping-form? set) (emit-grouping-form set)
+    (sequential? set)    (let [parts (mapv emit-set-item set)]
+                           [(str "(" (str/join ", " (sqls-of parts)) ")") (params-of parts)])
+    :else                (bad-arg (str ":grouping-sets expects each set to be a vector or list, got: " (show set)))))
+
+(defn- emit-grouping-form [form]
+  (let [tag   (first form)
+        items (vec (rest form))]
+    (if (= :grouping-sets tag)
+      (do
+        (when (empty? items)
+          (bad-arg (str ":grouping-sets expects at least one set, got: " (show form))))
+        (let [parts (mapv emit-grouping-set items)]
+          [(str "GROUPING SETS (" (str/join ", " (sqls-of parts)) ")") (params-of parts)]))
+      (do
+        (when (empty? items)
+          (bad-arg (str tag " expects at least one column, got: " (show form))))
+        (let [parts (mapv emit-rollup-item items)]
+          [(str (if (= :rollup tag) "ROLLUP" "CUBE") " (" (str/join ", " (sqls-of parts)) ")") (params-of parts)])))))
+
+(defn- emit-group-by [cols]
+  (let [parts (mapv (fn [x] (if (grouping-form? x) (emit-grouping-form x) (ident+ x)))
+                    (non-empty-vector! :group-by cols))]
+    [(str "GROUP BY " (str/join ", " (sqls-of parts))) (params-of parts)]))
 (defn- emit-returning       [cols] (emit-ident-list "RETURNING"       :returning       cols))
 (defn- emit-where-clause    [w]    (prefixed "WHERE"  (emit-where w)))
 (defn- emit-having-clause   [w]    (prefixed "HAVING" (emit-where w)))

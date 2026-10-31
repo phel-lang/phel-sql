@@ -116,6 +116,17 @@ Vector of columns (any identifier or tagged form).
 {:group-by [[:fn :date_trunc "month" :ts]]}
 ```
 
+`[:rollup ...]`, `[:cube ...]` and `[:grouping-sets ...]` are valid only as items of `:group-by`. Items inside them are ordinary identifiers, so tagged forms and their params work. `:rollup` and `:cube` need at least one column. `:grouping-sets` takes one vector or list per set; an empty one renders `()`. A set may also be a nested `:rollup`, `:cube` or `:grouping-sets` form. Inside `:rollup` and `:cube`, a plain vector such as `[:b :c]` renders as the composite `(b, c)`.
+
+The syntax follows Postgres and SQL Server. MySQL only supports `WITH ROLLUP`, and SQLite supports none of it.
+
+```phel
+{:group-by [[:rollup :region :city]]}                 ; GROUP BY ROLLUP (region, city)
+{:group-by [:country [:cube :region :city]]}          ; GROUP BY country, CUBE (region, city)
+{:group-by [[:grouping-sets [:region :city] [:region] []]]}
+; GROUP BY GROUPING SETS ((region, city), (region), ())
+```
+
 ### `:having`
 
 Same shape as `:where`. Lives between `:group-by` and `:order-by`.
@@ -335,6 +346,7 @@ Malformed input throws `InvalidArgumentException`. The message names the problem
 - WHERE: an unknown operator, a wrong argument count, a body that is not a vector, an empty `:in` list, an untagged vector as an operand.
 - A bad order direction or nulls modifier, a bad lock mode, a negative or non-integer `:limit` or `:offset`.
 - A malformed CTE, `:select-distinct-on` map, `[:raw ...]`, alias, `:case`, window spec, `:window` entry or name, `[:over ...]` window argument or frame token.
+- `:group-by`: an empty `:rollup`, `:cube` or `:grouping-sets`, a grouping set that is not a vector, or one of these forms used outside `:group-by`.
 - INSERT: missing `:insert-into`, neither `:values` nor `:query`, both of them, a `:query` that is not a map, an INSERT/UPDATE/DELETE query, a query without a select clause, a VALUES `:query` with map rows, mixed, empty or ragged rows, a row width that differs from `:columns`, a map key missing from `:columns`.
 - Upsert: a key without `:on-conflict`, `:on-conflict` without `:do-nothing` or `:do-update-set`, both `:do-nothing` and `:do-update-set`, both `:on-conflict` and `:on-duplicate-key-update`.
 - UPDATE without `:set`, an empty or non-map `:set` or `:on-duplicate-key-update`.
