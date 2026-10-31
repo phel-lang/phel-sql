@@ -53,7 +53,7 @@ Each `test` is a WHERE vector. Each `then` value and the `:else` value is an ope
 
 ## `[:over expr window-spec]`
 
-Window function. `expr` is any expression, usually `[:fn :row_number]` or `[:fn :sum :col]`. `window-spec` is a map with up to three keys: `:partition-by`, `:order-by` and `:frame`.
+Window function. `expr` is any expression, usually `[:fn :row_number]` or `[:fn :sum :col]`. `window-spec` is a map with up to four keys: `:window`, `:partition-by`, `:order-by` and `:frame`. It can also be a keyword or string that names a window defined by the `:window` clause.
 
 ```phel
 [:over [:fn :row_number] {}]
@@ -62,6 +62,26 @@ Window function. `expr` is any expression, usually `[:fn :row_number]` or `[:fn 
 [:over [:fn :row_number] {:partition-by [:dept]
                           :order-by [[:salary :desc]]}]
 ;; -> row_number() OVER (PARTITION BY dept ORDER BY salary DESC)
+```
+
+### Named windows
+
+A keyword or string as the second item renders `OVER name`. Define the window with the `:window` clause. The library does not check that the name exists.
+
+```phel
+{:select [[[:over [:fn :rank] :w] :r]]
+ :from   [:emp]
+ :window [[:w {:partition-by [:dept]}]]}
+;; -> SELECT rank() OVER w AS r FROM emp WINDOW w AS (PARTITION BY dept)
+```
+
+### `:window` key
+
+A spec map can extend a named window. The name comes first inside the parentheses.
+
+```phel
+[:over [:fn :sum :x] {:window :w :order-by [:day]}]
+;; -> sum(x) OVER (w ORDER BY day)
 ```
 
 ### `:frame`

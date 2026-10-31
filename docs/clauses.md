@@ -2,7 +2,7 @@
 
 Every clause emits SQL in a fixed order, regardless of map insertion order.
 
-- SELECT order: `:with`, `:with-recursive`, one of (`:select` / `:select-distinct` / `:select-distinct-on`), `:from`, joins, `:where`, `:group-by`, `:having`, `:order-by`, `:limit`, `:offset`, `:for`, `:returning`.
+- SELECT order: `:with`, `:with-recursive`, one of (`:select` / `:select-distinct` / `:select-distinct-on`), `:from`, joins, `:where`, `:group-by`, `:having`, `:window`, `:order-by`, `:limit`, `:offset`, `:for`, `:returning`.
 - UPDATE order: `:with`, `:update`, `:set`, `:from`, `:where`, `:order-by`, `:limit`, `:returning`.
 - DELETE order: `:with`, `:delete-from`, `:where`, `:order-by`, `:limit`, `:returning`.
 - INSERT order: `:with`, `:insert-into`, `:columns`, `:values` or `:query`, `:on-conflict` / `:on-duplicate-key-update`, `:returning`.
@@ -122,6 +122,18 @@ Same shape as `:where`. Lives between `:group-by` and `:order-by`.
 
 ```phel
 {:having [:> [:fn :count :*] 5]}
+```
+
+### `:window`
+
+Vector of `[name spec]` pairs. The name is a keyword or string. Each spec is a window-spec map, as in `[:over expr spec]`, and may use `:window` to extend an earlier window. Lives between `:having` and `:order-by`. Specs are not checked against the names used in `:over`.
+
+```phel
+{:select [[[:over [:fn :rank] :w] :r]]
+ :from   [:emp]
+ :window [[:w {:partition-by [:dept]}]
+          [:w2 {:window :w :order-by [:salary]}]]}
+;; -> SELECT rank() OVER w AS r FROM emp WINDOW w AS (PARTITION BY dept), w2 AS (w ORDER BY salary)
 ```
 
 ### `:order-by`
@@ -322,7 +334,7 @@ Malformed input throws `InvalidArgumentException`. The message names the problem
 - An empty or non-sequential value for a list clause.
 - WHERE: an unknown operator, a wrong argument count, a body that is not a vector, an empty `:in` list, an untagged vector as an operand.
 - A bad order direction or nulls modifier, a bad lock mode, a negative or non-integer `:limit` or `:offset`.
-- A malformed CTE, `:select-distinct-on` map, `[:raw ...]`, alias, `:case`, window spec or frame token.
+- A malformed CTE, `:select-distinct-on` map, `[:raw ...]`, alias, `:case`, window spec, `:window` entry or name, `[:over ...]` window argument or frame token.
 - INSERT: missing `:insert-into`, neither `:values` nor `:query`, both of them, a `:query` that is not a map, an INSERT/UPDATE/DELETE query, a query without a select clause, a VALUES `:query` with map rows, mixed, empty or ragged rows, a row width that differs from `:columns`, a map key missing from `:columns`.
 - Upsert: a key without `:on-conflict`, `:on-conflict` without `:do-nothing` or `:do-update-set`, both `:do-nothing` and `:do-update-set`, both `:on-conflict` and `:on-duplicate-key-update`.
 - UPDATE without `:set`, an empty or non-map `:set` or `:on-duplicate-key-update`.

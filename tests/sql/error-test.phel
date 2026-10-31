@@ -253,3 +253,39 @@
 (deftest test-rejects-insert-query-values-with-map-rows
   (is (thrown-with-msg? \InvalidArgumentException ":query VALUES rows must be vectors (use :columns to name them), got: {:values [{:a 1}]}"
                         (sql/format {:insert-into :t :query {:values [{:a 1}]}}))))
+
+(deftest test-rejects-empty-window
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :window []}))))
+
+(deftest test-rejects-window-not-pairs
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :window [:w]}))))
+
+(deftest test-rejects-window-pair-wrong-size
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :window [[:w {} {}]]}))))
+
+(deftest test-rejects-window-name-not-keyword-or-string
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :window [[1 {}]]}))))
+
+(deftest test-rejects-window-spec-not-a-map
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :window [[:w [:dept]]]}))))
+
+(deftest test-rejects-window-invalid-name
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [:id] :from [:t] :window [[:w-- {}]]}))))
+
+(deftest test-rejects-over-bad-window-name
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:over [:fn :rank] 42]] :from [:t]}))))
+
+(deftest test-rejects-over-vector-second-argument
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:over [:fn :rank] [:w]]] :from [:t]}))))
+
+(deftest test-rejects-window-spec-bad-extended-name
+  (is (thrown? \InvalidArgumentException
+               (sql/format {:select [[:over [:fn :rank] {:window 42}]] :from [:t]}))))

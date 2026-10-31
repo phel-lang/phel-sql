@@ -12,6 +12,23 @@
 (defn- emit-where-clause    [w]    (prefixed "WHERE"  (emit-where w)))
 (defn- emit-having-clause   [w]    (prefixed "HAVING" (emit-where w)))
 
+;; ===========================================================================
+;; WINDOW
+;; ===========================================================================
+
+(defn- emit-named-window [pair]
+  (when-not (and (vector? pair) (= 2 (count pair)))
+    (bad-arg (str ":window entries must be [name spec] pairs, got: " (show pair))))
+  (let [[w-name spec] pair
+        [s p]         (emit-window-spec spec)]
+    (when-not (or (keyword? w-name) (string? w-name))
+      (bad-arg (str "window name must be a keyword or string, got: " (show w-name))))
+    [(str (ident w-name) " AS (" s ")") p]))
+
+(defn- emit-window [windows]
+  (let [parts (map emit-named-window (non-empty-vector! :window windows))]
+    [(str "WINDOW " (str/join ", " (sqls-of parts))) (params-of parts)]))
+
 (defn- emit-select-distinct-on [spec]
   (when-not (map? spec)
     (bad-arg ":select-distinct-on expects {:on [...] :select [...]}"))

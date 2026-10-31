@@ -56,3 +56,56 @@
 (deftest test-over-rejects-non-map-spec
   (is (thrown? \InvalidArgumentException
                (sql/format {:select [[:over [:fn :row_number] [:partition :dept]]]}))))
+
+(deftest test-over-named-window
+  (is (= ["SELECT rank() OVER w AS r FROM emp" []]
+         (sql/format {:select [[[:over [:fn :rank] :w] :r]] :from [:emp]}))))
+
+(deftest test-over-named-window-as-string
+  (is (= ["SELECT rank() OVER w FROM emp" []]
+         (sql/format {:select [[:over [:fn :rank] "w"]] :from [:emp]}))))
+
+(deftest test-window-clause-single
+  (is (= ["SELECT rank() OVER w AS r FROM emp WINDOW w AS (PARTITION BY dept)" []]
+         (sql/format {:window [[:w {:partition-by [:dept]}]]
+                      :select [[[:over [:fn :rank] :w] :r]]
+                      :from [:emp]}))))
+
+(deftest test-window-clause-multiple
+  (is (= ["SELECT id FROM emp WINDOW w AS (PARTITION BY dept), w2 AS (ORDER BY salary DESC)" []]
+         (sql/format {:select [:id] :from [:emp]
+                      :window [[:w {:partition-by [:dept]}]
+                               [:w2 {:order-by [[:salary :desc]]}]]}))))
+
+(deftest test-window-clause-empty-spec
+  (is (= ["SELECT id FROM emp WINDOW w AS ()" []]
+         (sql/format {:select [:id] :from [:emp] :window [[:w {}]]}))))
+
+(deftest test-window-clause-after-having-before-order-by
+  (is (= ["SELECT dept FROM emp GROUP BY dept HAVING count(*) > ? WINDOW w AS (PARTITION BY dept) ORDER BY dept LIMIT 5" [1]]
+         (sql/format {:limit 5 :order-by [:dept]
+                      :window [[:w {:partition-by [:dept]}]]
+                      :having [:> [:fn :count :*] 1]
+                      :group-by [:dept] :from [:emp] :select [:dept]}))))
+
+(deftest test-window-spec-extends-named-window
+  (is (= ["SELECT sum(x) OVER (w ORDER BY day) FROM t WINDOW w AS (PARTITION BY dept)" []]
+         (sql/format {:select [[:over [:fn :sum :x] {:window :w :order-by [:day]}]]
+                      :from [:t]
+                      :window [[:w {:partition-by [:dept]}]]}))))
+
+(deftest test-window-spec-extends-only
+  (is (= ["SELECT sum(x) OVER (w) FROM t" []]
+         (sql/format {:select [[:over [:fn :sum :x] {:window :w}]] :from [:t]}))))
+
+(deftest test-window-clause-spec-extends-another
+  (is (= ["SELECT id FROM t WINDOW w AS (PARTITION BY dept), w2 AS (w ORDER BY salary)" []]
+         (sql/format {:select [:id] :from [:t]
+                      :window [[:w {:partition-by [:dept]}]
+                               [:w2 {:window :w :order-by [:salary]}]]}))))
+
+(deftest test-window-spec-params-order
+  (is (= ["SELECT sum(x) OVER (PARTITION BY coalesce(a, ?)) FROM t WINDOW w AS (PARTITION BY coalesce(b, ?))" [1 2]]
+         (sql/format {:select [[:over [:fn :sum :x] {:partition-by [[:fn :coalesce :a 1]]}]]
+                      :from [:t]
+                      :window [[:w {:partition-by [[:fn :coalesce :b 2]]}]]}))))
