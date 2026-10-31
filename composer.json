@@ -26,6 +26,11 @@
   "scripts": {
     "test": "vendor/bin/phel test",
     "format": "vendor/bin/phel format",
+    "format:check": "vendor/bin/phel format --dry-run",
+    "smoke": [
+      "vendor/bin/phel build",
+      "php tests/smoke/compiled-load.php"
+    ],
     "repl": [
       "Composer\\Config::disableProcessTimeout",
       "vendor/bin/phel repl"
