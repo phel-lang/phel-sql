@@ -4,13 +4,13 @@
 ;; Simple SELECT-side clauses
 ;; ===========================================================================
 
-(defn- emit-select [cols] (prefixed "SELECT" (idents+ (non-empty-vector! :select cols))))
-(defn- emit-select-distinct [cols] (prefixed "SELECT DISTINCT" (idents+ (non-empty-vector! :select-distinct cols))))
-(defn- emit-from [xs] (prefixed "FROM" (idents+ (non-empty-vector! :from xs))))
-(defn- emit-group-by [cols] (prefixed "GROUP BY" (idents+ (non-empty-vector! :group-by cols))))
-(defn- emit-returning [cols] (prefixed "RETURNING" (idents+ (non-empty-vector! :returning cols))))
-(defn- emit-where-clause    [w]     (prefixed "WHERE"  (emit-where w)))
-(defn- emit-having-clause   [w]     (prefixed "HAVING" (emit-where w)))
+(defn- emit-select          [cols] (emit-ident-list "SELECT"          :select          cols))
+(defn- emit-select-distinct [cols] (emit-ident-list "SELECT DISTINCT" :select-distinct cols))
+(defn- emit-from            [xs]   (emit-ident-list "FROM"            :from            xs))
+(defn- emit-group-by        [cols] (emit-ident-list "GROUP BY"        :group-by        cols))
+(defn- emit-returning       [cols] (emit-ident-list "RETURNING"       :returning       cols))
+(defn- emit-where-clause    [w]    (prefixed "WHERE"  (emit-where w)))
+(defn- emit-having-clause   [w]    (prefixed "HAVING" (emit-where w)))
 
 (defn- emit-select-distinct-on [spec]
   (when-not (map? spec)
