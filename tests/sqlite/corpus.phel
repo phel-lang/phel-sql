@@ -1,0 +1,69 @@
+(ns phel-sql-tests.sqlite.corpus)
+
+;; Shared corpus: name -> [query-map expected-rows]. Each query runs on a
+;; fresh in-memory SQLite database seeded by the helper.
+
+(def queries
+  {:select-where
+   [{:select [:id :name] :from [:users] :where [:= :status "active"] :order-by [:id]}
+    [[1 "alice"] [2 "bob"]]]
+
+   :select-limit-offset
+   [{:select [:id] :from [:users] :order-by [[:id :desc]] :limit 2 :offset 1}
+    [[2] [1]]]
+
+   :select-group-by-having
+   [{:select [:dept [[:fn :count :*] :n]] :from [:users] :group-by [:dept]
+     :having [:> [:fn :count :*] 1]}
+    [["eng" 2]]]
+
+   :inner-join
+   [{:select [:u/name :o/total] :from [[:users :u]]
+     :join [[:orders :o] [:= :u/id :o/user_id]] :order-by [:o/id]}
+    [["alice" 10] ["alice" 20] ["bob" 30]]]
+
+   :left-join
+   [{:select [:u/name [[:fn :count :o/id] :n]] :from [[:users :u]]
+     :left-join [[:orders :o] [:= :u/id :o/user_id]]
+     :group-by [:u/id :u/name] :order-by [:u/id]}
+    [["alice" 2] ["bob" 1] ["carol" 0]]]
+
+   :cte
+   [{:with [[:active {:select [:id] :from [:users] :where [:= :status "active"]}]]
+     :select [:id] :from [:active] :order-by [:id]}
+    [[1] [2]]]
+
+   :window-function
+   [{:select [:name [[:over [:fn :row_number] {:partition-by [:dept] :order-by [[:salary :desc]]}] :rn]]
+     :from [:users] :order-by [:id]}
+    [["alice" 2] ["bob" 1] ["carol" 1]]]
+
+   :subquery-in
+   [{:select [:name] :from [:users]
+     :where [:in :id {:select [:user_id] :from [:orders] :where [:> :total 15]}]
+     :order-by [:id]}
+    [["alice"] ["bob"]]]
+
+   :insert-returning
+   [{:insert-into :users
+     :values [{:id 9 :email "z@x" :name "zed" :status "active" :dept "eng" :salary 1}]
+     :returning [:id :name]}
+    [[9 "zed"]]]
+
+   :insert-on-conflict-do-nothing
+   [{:insert-into :users :values [{:id 10 :email "a@x" :name "dup"}]
+     :on-conflict [:email] :do-nothing true :returning [:id]}
+    []]
+
+   :insert-on-conflict-do-update-returning
+   [{:insert-into :users :values [{:id 10 :email "a@x" :name "renamed"}]
+     :on-conflict [:email] :do-update-set {:name "renamed"} :returning [:id :name]}
+    [[1 "renamed"]]]
+
+   :update-returning
+   [{:update :users :set {:status "banned"} :where [:= :id 1] :returning [:id :status]}
+    [[1 "banned"]]]
+
+   :delete-returning
+   [{:delete-from :users :where [:= :id 3] :returning [:id]}
+    [[3]]]})
