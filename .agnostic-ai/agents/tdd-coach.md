@@ -3,16 +3,16 @@ name: tdd-coach
 description: Guides strict red-green-refactor TDD for new clauses, operators, or expression forms.
 model: {claude: sonnet}
 maxTurns: 25
-allowed_tools:
-  - Read
-  - Edit
-  - Write
+can:
+  - read
+  - edit
+  - write
   - Glob
   - Grep
-  - Bash(./vendor/bin/phel:*)
-  - Bash(vendor/bin/phel:*)
-  - Bash(composer test:*)
-  - Bash(composer format:*)
+  - shell(./vendor/bin/phel:*)
+  - shell(vendor/bin/phel:*)
+  - shell(composer test:*)
+  - shell(composer format:*)
 ---
 
 # TDD Coach

@@ -8,9 +8,11 @@ disable-model-invocation: true
 
 ## Context
 
+::target claude
 !`git branch --show-current`
 !`git status --porcelain`
 !`grep -E '^## \[' CHANGELOG.md | head -5`
+::end
 
 ## Instructions
 
@@ -25,7 +27,7 @@ disable-model-invocation: true
    Warn if empty — the release script bakes this section into the GitHub release notes.
 
 3. **Determine version**:
-   - If `$ARGUMENTS` provides a version, validate format `X.Y.Z`.
+   - If the argument provides a version, validate format `X.Y.Z`.
    - Otherwise `./release.sh` auto-bumps the minor.
 
 ### Phase 2: Release

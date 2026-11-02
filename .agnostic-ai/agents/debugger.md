@@ -3,13 +3,13 @@ name: debugger
 description: Diagnoses wrong SQL output, missing params, or emitter errors in the phel-sql pipeline.
 model: {claude: sonnet}
 maxTurns: 20
-allowed_tools:
-  - Read
+can:
+  - read
   - Glob
   - Grep
-  - Bash(./vendor/bin/phel:*)
-  - Bash(vendor/bin/phel:*)
-  - Bash(composer *)
+  - shell(./vendor/bin/phel:*)
+  - shell(vendor/bin/phel:*)
+  - shell(composer *)
 ---
 
 # Debugger

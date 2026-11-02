@@ -9,9 +9,11 @@ allowed-tools: "read, edit, shell(git *), shell(gh *)"
 
 ## Context
 
+::target claude
 !`git branch --show-current`
 !`git log main..HEAD --oneline`
 !`git diff main..HEAD --stat`
+::end
 
 ## Instructions
 
@@ -26,7 +28,7 @@ allowed-tools: "read, edit, shell(git *), shell(gh *)"
    ```
 
 3. **Generate PR title**:
-   - If `$ARGUMENTS` contains an issue number, fetch its title:
+   - If the argument contains an issue number, fetch its title:
      ```bash
      gh issue view <number> --json title -q '.title'
      ```

@@ -3,11 +3,11 @@ name: clean-code-reviewer
 description: Reviews Phel changes against project standards. Use for PR review, staged changes, or focused file audits.
 model: {claude: sonnet}
 memory: project
-allowed_tools:
-  - Read
+can:
+  - read
   - Glob
   - Grep
-  - Bash(git diff:*)
+  - shell(git diff:*)
 ---
 
 # Clean Code Reviewer

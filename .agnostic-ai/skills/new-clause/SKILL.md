@@ -11,14 +11,16 @@ Walks the contributor flow from `docs/contributing.md`. Picks the right files, a
 
 ## Context
 
+::target claude
 !`ls src/phel/sql/`
 !`ls tests/sql/`
+::end
 
 ## Instructions
 
 ### 1. Parse args
 
-- `$ARGUMENTS` → `<kind> <name>`.
+- the argument → `<kind> <name>`.
 - `kind` ∈ {`clause`, `where-op`, `tagged`}. If missing, ask.
 
 ### 2. Branch by kind

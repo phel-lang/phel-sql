@@ -11,6 +11,6 @@ Repo-maintenance config for phel-sql. Inspired by `.claude/` in [phel-lang/phel-
 | `hooks/` | `format-phel.sh` (PostToolUse), `protect-files.sh` (PreToolUse), `compact-context.sh` (SessionStart). |
 | `agents/` | `clean-code-reviewer`, `debugger`, `tdd-coach`. |
 | `rules/` | `phel.md` (source + tests), `sql-dsl.md` (clause / dispatch invariants). |
-| `skills/` | `commit`, `pr`, `gh-issue`, `release`, `changelog`, `new-clause`. |
+| `skills/` | `commit`, `pr`, `phel-sql-gh-issue`, `release`, `changelog`, `new-clause`. |
 
 No PHP source, no PHPUnit, no static analysis pipeline. Single test command (`composer test`), single formatter (`composer format`).

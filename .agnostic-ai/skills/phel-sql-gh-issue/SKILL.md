@@ -10,13 +10,15 @@ disable-model-invocation: true
 
 Read both the issue body **and every comment** as requirements input. Maintainer follow-ups frequently add scope or override the original description; when a later comment conflicts with the body, prefer the comment.
 
+::target claude
 !`gh issue view ${ARGUMENTS#\#} --json number,url,title,body,labels,assignees,state,comments 2>/dev/null || echo "Provide an issue number"`
+::end
 
 ## Instructions
 
 ### Phase 1: Setup
 
-1. **Parse the issue number** from `$ARGUMENTS` (strip `#` if present).
+1. **Parse the issue number** from the argument (strip `#` if present).
 
 2. **Assign yourself if unassigned**:
    ```bash

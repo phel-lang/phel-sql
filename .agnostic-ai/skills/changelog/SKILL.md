@@ -9,13 +9,15 @@ allowed-tools: "read, edit, shell(git *)"
 
 ## Context
 
+::target claude
 !`git log $(git describe --tags --abbrev=0 2>/dev/null || echo HEAD~20)..HEAD --oneline`
+::end
 
 ## Instructions
 
 1. Read `CHANGELOG.md`.
 
-2. If `$ARGUMENTS` is provided, append it under the appropriate category in `## [Unreleased]`.
+2. If the argument is provided, append it under the appropriate category in `## [Unreleased]`.
 
 3. Else, analyze commits since the last tag and draft entries:
    - `### Added` — `feat:` commits.

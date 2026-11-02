@@ -9,9 +9,11 @@ allowed-tools: "read, edit, shell(composer *), shell(./vendor/bin/phel *), shell
 
 ## Context
 
+::target claude
 !`git diff --stat`
 !`git diff --cached --stat`
 !`git status --short`
+::end
 
 ## Instructions
 
@@ -36,7 +38,7 @@ allowed-tools: "read, edit, shell(composer *), shell(./vendor/bin/phel *), shell
 4. **Stage files** — add by name, never `git add -A`.
 
 5. **Draft commit message** using conventional commit format:
-   - If `$ARGUMENTS` is provided, use it.
+   - If the argument is provided, use it.
    - Otherwise, analyze the staged diff and generate one.
    - Prefixes: `feat:`, `fix:`, `ref:`, `chore:`, `docs:`, `test:`, `ci:`.
    - Add `(<scope>)` when scoped to one area (`select`, `where`, `dml`, `expr`, etc.).
