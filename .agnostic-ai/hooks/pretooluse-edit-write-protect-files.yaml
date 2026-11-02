@@ -1,5 +1,5 @@
 command: .claude/hooks/protect-files.sh
-description: Runs `.claude/hooks/protect-files.sh` on PreToolUse for Edit|Write.
+description: Block edits to protected files before they happen.
 event: PreToolUse
 matcher: Edit|Write
 name: pretooluse-edit-write-protect-files

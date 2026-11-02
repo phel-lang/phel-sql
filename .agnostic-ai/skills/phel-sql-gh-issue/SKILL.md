@@ -1,126 +1,41 @@
 ---
-description: Fetch a GitHub issue, branch, implement with TDD, open a PR
+description: Use to take a phel-sql GitHub issue through branch, TDD, PR, CI and merge.
 argument-hint: "[issue-number]"
 disable-model-invocation: true
 ---
 
-# GitHub Issue Workflow
+# GitHub issue workflow
 
-## Context
-
-Read both the issue body **and every comment** as requirements input. Maintainer follow-ups frequently add scope or override the original description; when a later comment conflicts with the body, prefer the comment.
+Read the issue body and every comment as requirements. When a later comment conflicts with the body, the comment wins.
 
 ::target claude
 !`gh issue view ${ARGUMENTS#\#} --json number,url,title,body,labels,assignees,state,comments 2>/dev/null || echo "Provide an issue number"`
 ::end
 
-## Instructions
+## Setup
 
-### Phase 1: Setup
+1. Parse the issue number from the argument (strip `#`).
+2. If unassigned: `gh issue edit <number> --add-assignee @me`.
+3. Branch from fresh `main`: `git checkout main && git pull && git checkout -b <prefix><issue-number>-<slug>`. Prefix from labels: `bug` is `fix/`, `enhancement` or none is `feat/`, `documentation` is `docs/`.
 
-1. **Parse the issue number** from the argument (strip `#` if present).
+## Plan
 
-2. **Assign yourself if unassigned**:
-   ```bash
-   gh issue edit <number> --add-assignee @me
-   ```
+4. Plan Mode: say whether it touches a clause, operator, tagged form, error or docs; list the files (`src/phel/sql/<file>.phel`, `src/phel/sql.phel` for a new cross-file declaration, `tests/sql/<topic>-test.phel`, docs); list the tests (one per shape, one per error); give the order.
 
-3. **Branch from fresh `main`**:
+## Implement (TDD)
 
-   Prefix from labels:
-   - `bug` → `fix/`
-   - `enhancement` → `feat/`
-   - `documentation` → `docs/`
-   - No label → `feat/`
+5. After approval: failing `deftest`s first, then the minimal emitter or branch, then refactor while green.
+6. `composer test`.
 
-   ```bash
-   git checkout main && git pull
-   git checkout -b <prefix><issue-number>-<slug>
-   ```
+## Ship
 
-### Phase 2: Plan
+7. Update `CHANGELOG.md` under `## [Unreleased]`.
+8. Commit specific files: `<type>(<scope>): <description>` with the body `Related to #<issue-number>`.
+9. Final refactor pass, as the last commit before the PR. Re-review every touched file for duplication, dead branches, unused locals, naming drift against the surrounding sub-file, violations of `.agnostic-ai/rules/phel.md` and `sql-dsl.md`, and speculative abstractions. Apply, rerun `composer test`, commit as `ref(<scope>): polish <area> after #<issue-number>`. If nothing turns up, say so in the PR body.
+10. Open the PR with `/pr #<issue-number>`.
 
-4. **Enter Plan Mode**:
-   - Identify whether this touches a clause, operator, tagged form, error, or docs.
-   - List files to touch (`src/phel/sql/<file>.phel`, `src/phel/sql.phel` if a new cross-file decl is needed, `tests/sql/<topic>-test.phel`, docs).
-   - Plan tests first.
+## Verify and merge
 
-5. **Create plan** with: summary, files to touch, test list (one per shape + one per error), implementation order.
-
-### Phase 3: Implement (TDD)
-
-6. After plan approval:
-   - Write failing `deftest`s first.
-   - Implement the minimum emitter / branch to pass.
-   - Refactor while green.
-
-7. **Run full suite**:
-   ```bash
-   composer test
-   ```
-
-### Phase 4: Ship
-
-8. **Update `CHANGELOG.md`** under `## [Unreleased]`.
-
-9. **Commit**:
-   ```bash
-   git add <specific-files>
-   git commit -m "<type>(<scope>): <description>
-
-   Related to #<issue-number>"
-   ```
-
-10. **Final refactor pass (mandatory, last commit before PR)**:
-    Re-review every touched file. Look for:
-    - duplication (extract or reuse);
-    - dead branches, unused locals;
-    - naming drift vs. surrounding sub-file;
-    - violations of `.agnostic-ai/rules/phel.md`, `sql-dsl.md`;
-    - speculative abstractions.
-
-    Apply, re-run `composer test`, commit as a separate `ref(<scope>):` — must be the final commit on the branch:
-    ```bash
-    git commit -m "ref(<scope>): polish <area> after #<issue-number>
-
-    Related to #<issue-number>"
-    ```
-    If the review surfaces nothing, record that in the PR body instead of skipping silently.
-
-11. **Open PR** via `/pr #<issue-number>`.
-
-### Phase 5: Verify & Merge
-
-12. **Wait for CI**:
-    ```bash
-    gh pr checks <pr-number> --watch
-    ```
-    Fix red checks on the branch.
-
-13. **Merge** (admin bypass when allowed):
-    ```bash
-    gh pr merge <pr-number> --squash --admin --delete-branch
-    ```
-    If `--admin` is rejected, fall back to `--auto --squash --delete-branch` and surface that the PR awaits approval.
-
-14. **Sync local main**:
-    ```bash
-    git checkout main && git fetch origin main && git reset --hard origin/main
-    ```
-
-## Checklist
-
-- [ ] Issue fetched (body + comments)
-- [ ] Self-assigned
-- [ ] Branch from fresh `origin/main`
-- [ ] Plan approved
-- [ ] Tests written first (per shape + error)
-- [ ] Implementation complete
-- [ ] `composer test` green
-- [ ] CHANGELOG updated
-- [ ] Feature commit with issue reference
-- [ ] Final `ref(...)` polish commit
-- [ ] PR via `/pr`
-- [ ] CI green
-- [ ] Merged (admin or auto)
-- [ ] Local `main` synced
+11. `gh pr checks <pr-number> --watch`. Fix red checks on the branch.
+12. `gh pr merge <pr-number> --squash --admin --delete-branch`. If `--admin` is rejected, use `--auto --squash --delete-branch` and say the PR awaits approval.
+13. `git checkout main && git fetch origin main && git reset --hard origin/main`.

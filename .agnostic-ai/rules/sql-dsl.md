@@ -1,45 +1,40 @@
 ---
-description: Clause / emitter / dispatch rules for phel-sql
+description: Use when changing emitters, clauses, dispatch maps or tagged forms in phel-sql.
 globs: src/phel/sql/**,src/phel/sql.phel
 ---
 
-# SQL DSL Rules
+# SQL DSL
 
-## Architecture (two layers)
+Two layers (details in `docs/contributing.md`):
 
-1. **Expressions**: `ident+`, `operand`, `emit-tagged` handle anything inside a clause (identifiers, values, tagged forms, subqueries). Always return `[sql params]`.
-2. **Clauses**: emitter functions registered in dispatch maps in `src/phel/sql/dispatch.phel`:
-   - `select-emitters` / `select-order`
-   - `update-emitters` / `update-order`
-   - `delete-emitters` / `delete-order`
-   INSERT and set-ops are hand-assembled in `src/phel/sql/dml.phel` and via the dispatch entry point.
-
-`statement-type` auto-detects the kind from clause keys present.
+1. Expressions: `ident+`, `operand`, `emit-tagged` handle everything inside a clause (identifiers, values, subqueries, tagged forms `:fn`, `:cast`, `:case`, `:over`, `:filter`, `:lateral`, `:raw`). All return `[sql params]`.
+2. Clauses: emitters registered in the dispatch maps of `src/phel/sql/dispatch.phel`: `select-emitters` / `select-order`, `update-emitters` / `update-order`, `delete-emitters` / `delete-order`. INSERT and set operations are hand-assembled in `src/phel/sql/dml.phel`. `statement-type` picks the kind from the clause keys present.
 
 ## Invariants
 
-- Every emitter returns `[sql params]`. Never concatenate a value into the SQL string.
-- Subqueries must recurse through `ident+` / `operand` / `compile-query`. Don't reimplement recursion at the call site.
-- Clause order is fixed by `*-order` vectors. The input map order does not matter (see `test-clause-order-is-fixed`).
-- The escape hatch is `[:raw "SQL"]`: never silently drop unknown shapes; throw with the offending value.
+- Never concatenate a value into the SQL string; return it in `params`.
+- Subqueries recurse through `ident+`, `operand` or `compile-query`. Do not reimplement recursion at the call site.
+- Clause order comes from the `*-order` vectors, not the input map (`test-clause-order-is-fixed`).
+- Throw on unknown shapes with the offending value. `[:raw "SQL"]` is the only escape hatch.
 
-## Adding a clause to SELECT
+## Add a SELECT clause
 
-1. Write `defn- emit-<name> [v]` in `src/phel/sql/clause.phel` (or appropriate file).
-2. Register it in `select-emitters` and place its keyword in `select-order` at the correct position.
-3. Add a `tests/sql/<name>-test.phel` per accepted shape and per error.
-4. Update README coverage table and `docs/clauses.md`.
+1. Write `defn- emit-<name> [v]` in `src/phel/sql/clause.phel` (or a fitting sub-file).
+2. Register it in `select-emitters` and put its keyword in `select-order` at the right position. Add a `(declare ...)` in `src/phel/sql.phel` for a new cross-file function.
+3. Add `tests/sql/<name>-test.phel` (one test per accepted shape) and an error case in `tests/sql/error-test.phel`.
+4. Update the README coverage table and `docs/clauses.md`.
 
-## Adding a WHERE operator
+UPDATE and DELETE work the same way with their own maps.
 
-1. Add to `binary-ops` if simple binary, or extend the `case` in `emit-where` for special shapes.
-2. Tests in `tests/sql/where-test.phel` and an error case in `error-test.phel`.
+## Add a WHERE operator
+
+1. Simple binary: add to `binary-ops` in `src/phel/sql/where.phel`. Special shape: extend the `case` in `emit-where` and `special-op-arity`.
+2. Tests in `tests/sql/where-test.phel` and an error case in `tests/sql/error-test.phel`.
 3. Update `docs/clauses.md`.
 
-## Adding a tagged expression form
+## Add a tagged expression form
 
-1. Add the tag to `expr-tags`.
-2. Write `emit-<thing>` returning `[sql params]`.
-3. Add a branch in `emit-tagged`.
-4. Tests in `tests/sql/expr-test.phel` and `docs/expressions.md` entry.
-5. Now usable everywhere an identifier or operand is accepted, including nested inside other tagged forms.
+1. Add the tag to `expr-tags` in `src/phel/sql/expr.phel`.
+2. Write `emit-<thing>` returning `[sql params]` and add a branch in `emit-tagged`. It then works anywhere an identifier or operand is accepted, nested forms included.
+3. Tests in `tests/sql/expr-test.phel` and an error case in `tests/sql/error-test.phel`.
+4. Add a `docs/expressions.md` entry.

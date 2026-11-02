@@ -8,7 +8,7 @@ FILE=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
 if [[ "$FILE" == */release.sh ]] || \
    [[ "$FILE" == */.github/* ]] || \
    [[ "$FILE" == */composer.lock ]]; then
-    echo "Protected file: $FILE — edit blocked. Ask user to confirm before retrying." >&2
+    echo "Protected file: $FILE - edit blocked. Ask user to confirm before retrying." >&2
     exit 2
 fi
 exit 0

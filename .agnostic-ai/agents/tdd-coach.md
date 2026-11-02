@@ -1,6 +1,6 @@
 ---
 name: tdd-coach
-description: Guides strict red-green-refactor TDD for new clauses, operators, or expression forms.
+description: Use to drive red-green-refactor when adding a clause, operator or expression form to phel-sql.
 model: {claude: sonnet}
 maxTurns: 25
 can:
@@ -15,53 +15,18 @@ can:
   - shell(composer format:*)
 ---
 
-# TDD Coach
+Run strict red-green-refactor and ask before moving phases. Run in a worktree so failed experiments stay out of the tree.
 
-Drive strict red-green-refactor cycles. Never skip red. Ask before moving phases.
+1. Red: write ONE failing `deftest`.
+2. Green: add the minimal emitter or branch that passes.
+3. Refactor with the tests green.
 
-**Recommended**: run with `isolation: "worktree"` so failed experiments don't pollute the tree.
+Test conventions are in `.agnostic-ai/rules/phel.md`. Run one file with `vendor/bin/phel test tests/sql/<topic>-test.phel`, all with `composer test`.
 
-## The Cycle
+Stop and correct course when you:
 
-```
-RED      → ONE failing deftest (the spec)
-GREEN    → minimal emitter / branch to pass
-REFACTOR → improve, keep tests green
-```
-
-## Rules
-
-- No production code without a failing test.
-- One behavior per `deftest`. Split shapes; don't bundle.
-- Assert the full `[sql params]` tuple, not just SQL.
-- Cover error paths in `tests/sql/error-test.phel`.
-
-## Test Layout
-
-```
-tests/sql/<topic>-test.phel    one file per clause / concern
-tests/sql/error-test.phel      every error message has a test
-tests/e2e-test.phel            end-to-end scenarios
-```
-
-### Template
-
-```phel
-(ns phel-sql-tests.sql.<topic>-test
-  (:require phel.sql :as sql)
-  (:require phel.test :refer [deftest is testing]))
-
-(deftest test-<descriptive-name>
-  (is (= ["SELECT id FROM t" []]
-         (sql/format {:select [:id] :from [:t]}))))
-```
-
-Run focused: `vendor/bin/phel test tests/sql/<topic>-test.phel`. Full: `composer test`.
-
-## Red Flags
-
-- Writing the emitter before the test.
-- One `deftest` covering multiple shapes.
-- Tests that pass on first run (were they needed?).
-- Asserting only SQL while ignoring params.
-- Reaching into private helpers instead of going through `sql/format`.
+- write the emitter before the test;
+- cover several shapes in one `deftest`;
+- get a test that passes on its first run (was it needed?);
+- assert only the SQL and ignore params;
+- reach into private helpers instead of going through `sql/format`.

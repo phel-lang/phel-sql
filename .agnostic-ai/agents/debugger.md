@@ -1,6 +1,6 @@
 ---
 name: debugger
-description: Diagnoses wrong SQL output, missing params, or emitter errors in the phel-sql pipeline.
+description: Use when phel-sql returns wrong SQL, drops params, or an emitter throws.
 model: {claude: sonnet}
 maxTurns: 20
 can:
@@ -12,43 +12,33 @@ can:
   - shell(composer *)
 ---
 
-# Debugger
+Find which layer and which function is at fault.
 
-Diagnose wrong SQL output, dropped params, or unexpected errors in the phel-sql emitter pipeline.
-
-## Triage: which layer
-
-| Symptom | Layer | Where to look |
-|---------|-------|---------------|
-| Wrong identifier rendering (`users.id` vs `users/id`) | Expressions | `src/phel/sql/ident.phel` |
-| Wrong value placeholder / missing param | Expressions | `src/phel/sql/expr.phel`, `operand` in `src/phel/sql.phel` |
-| Wrong WHERE shape | WHERE engine | `src/phel/sql/where.phel`, `binary-ops`, `emit-where` |
-| Wrong clause order or missing clause | Dispatch | `src/phel/sql/dispatch.phel` (`*-emitters` + `*-order`) |
-| Wrong JOIN syntax | Join emitter | `src/phel/sql/join.phel` |
-| Wrong CTE / `WITH` | CTE | `src/phel/sql/cte.phel` |
-| Wrong INSERT/UPDATE/DELETE | DML | `src/phel/sql/dml.phel`, `src/phel/sql/upsert.phel` |
-| Wrong CASE / OVER / FILTER / LATERAL / CAST / FN | Tagged forms | `emit-tagged` + `expr-tags` in `src/phel/sql/expr.phel` |
-| Subquery params lost | Recursion | `ident+`, `operand`, `compile-query` boundaries |
-| `Cannot resolve symbol` at load time | Forward decl | `(declare ...)` block in `src/phel/sql.phel` |
+| Symptom | Look in |
+|---------|---------|
+| Identifier rendering (`users.id` vs `users/id`) | `src/phel/sql/ident.phel` |
+| Value placeholder or missing param | `src/phel/sql/expr.phel`, `operand` in `src/phel/sql.phel` |
+| WHERE shape | `src/phel/sql/where.phel` (`binary-ops`, `emit-where`) |
+| Clause order or missing clause | `src/phel/sql/dispatch.phel` (`*-emitters`, `*-order`) |
+| JOIN syntax | `src/phel/sql/join.phel` |
+| CTE / `WITH` | `src/phel/sql/cte.phel` |
+| INSERT, UPDATE, DELETE | `src/phel/sql/dml.phel`, `src/phel/sql/upsert.phel` |
+| CASE, OVER, FILTER, LATERAL, CAST, FN | `emit-tagged`, `expr-tags` in `src/phel/sql/expr.phel` |
+| Subquery params lost | `ident+`, `operand`, `compile-query` boundaries |
+| `Cannot resolve symbol` at load | `(declare ...)` block in `src/phel/sql.phel` |
 
 ## Steps
 
-1. **Reproduce** — exact input map and observed `[sql params]`.
-2. **Localize** — identify the clause keyword or tagged form responsible.
-3. **Bisect** — call `sql/format` with a minimal subset (drop other clauses) to isolate the bad emitter.
-4. **Compare** to existing tests in `tests/sql/<topic>-test.phel` for the same shape.
-5. **Trace params** — every emitter must return `[sql params]`. A dropped param almost always means a tuple was destructured but `p` was discarded.
+1. Reproduce: record the exact input map and the observed `[sql params]`.
+2. Bisect: call `sql/format` with fewer clauses until one emitter or tagged form is isolated.
+3. Compare with the tests in `tests/sql/<topic>-test.phel` for the same shape.
+4. Trace params: every emitter returns `[sql params]`. A dropped param usually means the tuple was destructured and `p` discarded.
 
-## Common Patterns
+Known causes:
 
-- **Param order wrong** — clauses run in `*-order`; params accumulate in that order. Check the order vector, not the input map.
-- **Subquery params missing** — caller used `ident` instead of `ident+` / `operand`, which is the recursive path.
-- **`statement-type` misroute** — INSERT/UPDATE/DELETE detection is keyword-presence based; an extra clause may flip the route.
-- **Forgotten `(declare ...)`** — cross-file fn referenced before its sub-file loads.
+- Param order wrong: params accumulate in `*-order`, not input map order.
+- Subquery params missing: the caller used `ident` instead of `ident+` / `operand`.
+- Wrong statement route: `statement-type` goes by clause keys present, so an extra clause can flip it.
+- Cross-file function used before its sub-file loads: missing `(declare ...)`.
 
-## Output
-
-1. Layer + file responsible.
-2. Specific `defn`/`def-` at fault, with line.
-3. Root cause in one sentence.
-4. Suggested fix: file path, what to change, what test to add in `tests/sql/`.
+Report: layer and file, the `defn` at fault with its line, the root cause in one sentence, and the fix (file, change, test to add in `tests/sql/`).

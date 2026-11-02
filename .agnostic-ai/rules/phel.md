@@ -1,52 +1,26 @@
 ---
-description: Phel conventions + test layout for phel-sql
+description: "Use when editing Phel source or tests in phel-sql (naming, docstrings, namespaces, test layout)."
 globs: src/**,tests/**
 ---
 
-# Phel Conventions
+# Phel conventions
 
-## Naming
+## Source
 
-- kebab-case for symbols: `emit-where`, `compile-query`, `binary-ops`.
-- `defn-` / `def-` for private (not part of the public API).
+- kebab-case symbols (`emit-where`, `compile-query`, `binary-ops`). `defn-` / `def-` for anything not public.
 - Namespace `phel.sql`. Sub-files in `src/phel/sql/` start with `(in-ns phel.sql)`.
-- Test namespaces: `phel-sql-tests.sql.<topic>-test`.
+- Public functions (`sql/format` and supporting helpers) carry `:doc` (plain prose), `:see-also` (strings) and `:example` (matches the real return shape).
+- Pure functions only: no I/O, no PDO, no globals. Every emitter returns `[sql params]`.
+- Use threading (`->`, `->>`) and `case` for dispatch where clearer. Use `defstruct` for fixed-shape data (none yet).
+- Comments: `;` trailing, `;;` standalone. Keep section banners (`;; ====`) to forward-declaration blocks and sub-file load points.
+- `src/phel/sql.phel` declares cross-file symbols with `(declare ...)`, then `(load "sql/<file>")`s the sub-files. Add a new cross-file function to the declare block first.
 
-## Docstrings
+## Tests
 
-Public functions (only `sql/format` and supporting public helpers) get:
-
-- `:doc`: what it does, in plain prose.
-- `:see-also`: related symbols as strings.
-- `:example`: inline usage example matching the actual return shape.
-
-## Comments
-
-- `;` for line comments. `;;` for standalone, `;` for trailing.
-- Use section banners (`;; ====`) sparingly: the existing ones mark forward-decl blocks and sub-file load points.
-
-## Semantics
-
-- Pure functions only: no I/O, no PDO, no globals.
-- Every emitter returns `[sql params]`. Tuple discipline is load-bearing.
-- Prefer threading (`->`, `->>`) and `case` for dispatch where it improves clarity.
-- Use `defstruct` for data, not maps-of-keywords, when shape is fixed (currently not used: keep an eye out).
-
-## Multi-file namespace
-
-`src/phel/sql.phel` declares cross-file symbols up-front with `(declare ...)` then `(load "sql/<file>")`s the sub-files. Adding a new cross-file fn? Update the declare block first.
-
-## Tests (`tests/sql/`)
-
-Layout:
-
-```
-tests/sql/<topic>-test.phel    one file per clause / concern
-tests/sql/error-test.phel      every thrown error has a test
-tests/e2e-test.phel            end-to-end black-box scenarios
-```
-
-Files named `<topic>-test.phel`, namespaces `phel-sql-tests.sql.<topic>-test`.
+- One file per clause or concern: `tests/sql/<topic>-test.phel`, namespace `phel-sql-tests.sql.<topic>-test`. Every thrown error has a case in `tests/sql/error-test.phel`. Black-box scenarios go in `tests/e2e-test.phel`.
+- One behavior per `deftest`. Split shapes; do not bundle.
+- Assert the full `[sql params]` tuple. Asserting only the SQL lets parameter bugs through.
+- Go through `sql/format`, not private helpers.
 
 ```phel
 (ns phel-sql-tests.sql.<topic>-test
@@ -57,10 +31,3 @@ Files named `<topic>-test.phel`, namespaces `phel-sql-tests.sql.<topic>-test`.
   (is (= ["SELECT id FROM t" []]
          (sql/format {:select [:id] :from [:t]}))))
 ```
-
-Rules:
-
-- One behavior per `deftest`. Split shapes; don't bundle.
-- Assert the **full `[sql params]` tuple**. Asserting only SQL lets param bugs slip.
-- Every thrown error gets a case in `error-test.phel`.
-- Run focused: `vendor/bin/phel test tests/sql/<topic>-test.phel`. Full: `composer test`.

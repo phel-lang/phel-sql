@@ -1,5 +1,5 @@
 ---
-description: Format, test, and commit with a conventional commit message
+description: Use to format, test and commit staged work with a conventional commit message.
 argument-hint: "[optional commit message]"
 disable-model-invocation: true
 allowed-tools: "read, edit, shell(composer *), shell(./vendor/bin/phel *), shell(vendor/bin/phel *), shell(git *)"
@@ -7,48 +7,15 @@ allowed-tools: "read, edit, shell(composer *), shell(./vendor/bin/phel *), shell
 
 # Commit
 
-## Context
-
 ::target claude
 !`git diff --stat`
 !`git diff --cached --stat`
 !`git status --short`
 ::end
 
-## Instructions
-
-### Phase 1: Format
-
-1. Format staged `.phel` files:
-   ```bash
-   composer format
-   ```
-2. If the formatter changed files, review and stage them.
-
-### Phase 2: Test
-
-3. Run the full suite (it's fast — pure Phel, no static analysis pipeline):
-   ```bash
-   composer test
-   ```
-   If any test fails, fix and re-run before continuing.
-
-### Phase 3: Commit
-
-4. **Stage files** — add by name, never `git add -A`.
-
-5. **Draft commit message** using conventional commit format:
-   - If the argument is provided, use it.
-   - Otherwise, analyze the staged diff and generate one.
-   - Prefixes: `feat:`, `fix:`, `ref:`, `chore:`, `docs:`, `test:`, `ci:`.
-   - Add `(<scope>)` when scoped to one area (`select`, `where`, `dml`, `expr`, etc.).
-   - **NEVER mention AI tooling.**
-
-6. **Commit**:
-   ```bash
-   git commit -m "<message>"
-   ```
-
-7. **CHANGELOG check** — if the prefix is `feat:` or `fix:`, verify `CHANGELOG.md` has been updated under `## [Unreleased]`. If not, warn before committing.
-
-8. Report: commit hash, message, and files included.
+1. `composer format`. Review and stage anything the formatter changed.
+2. `composer test`. Fix failures and rerun before continuing.
+3. Stage files by name, never `git add -A`.
+4. Message: the argument if given, otherwise derived from the staged diff. Prefixes `feat:`, `fix:`, `ref:`, `chore:`, `docs:`, `test:`, `ci:`; add `(<scope>)` for one area (`select`, `where`, `dml`, `expr`). No AI mention.
+5. For `feat:` and `fix:`, warn if `CHANGELOG.md` has no new entry under `## [Unreleased]`.
+6. Commit, then report the hash, message and files.
