@@ -19,7 +19,7 @@
   "Fresh in-memory SQLite database with the test schema."
   []
   (let [pdo (new \PDO "sqlite::memory:")]
-    (.setAttribute pdo php/PDO::ATTR_ERRMODE php/PDO::ERRMODE_EXCEPTION)
+    (.setAttribute pdo \PDO/ATTR_ERRMODE \PDO/ERRMODE_EXCEPTION)
     (foreach [ddl schema] (.exec pdo ddl))
     pdo))
 
@@ -29,9 +29,9 @@
   (let [stmt (.prepare pdo query)]
     ; execute() binds everything as text, which breaks integer comparisons
     (foreach [i value params]
-      (.bindValue stmt (inc i) value (if (int? value) php/PDO::PARAM_INT php/PDO::PARAM_STR)))
+      (.bindValue stmt (inc i) value (if (int? value) \PDO/PARAM_INT \PDO/PARAM_STR)))
     (.execute stmt)
-    (vec (map vec (php->phel (.fetchAll stmt php/PDO::FETCH_NUM))))))
+    (vec (map vec (php->phel (.fetchAll stmt \PDO/FETCH_NUM))))))
 
 (defn run-query
   "Format a query map and run it on a fresh database. Returns the rows."
